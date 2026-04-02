@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply m-0 font-display text-slate-900 antialiased;
+  }
+
+  * {
+    @apply box-border;
+  }
+}
+
+/* Auth: subtle grid + gradient (works alongside Tailwind utilities) */
+.auth-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(211, 35, 35, 0.06) 0%, rgba(15, 23, 42, 0.04) 50%, rgba(255, 100, 89, 0.05) 100%),
+    repeating-linear-gradient(
+      -12deg,
+      transparent,
+      transparent 48px,
+      rgba(15, 23, 42, 0.03) 48px,
+      rgba(15, 23, 42, 0.03) 49px
+    );
+}
+
+.auth-glass {
+  @apply bg-white/90 backdrop-blur-sm border border-white/60 shadow-lift;
+}
+
+.input-field {
+  @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400;
+  @apply focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15;
+}
+
+.btn-primary {
+  @apply inline-flex w-full items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-md transition;
+  @apply hover:bg-brand-dark focus:outline-none focus:ring-4 focus:ring-brand/30 disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+/* Dashboard map placeholder shimmer */
+.map-placeholder {
+  background: linear-gradient(110deg, #e2e8f0 0%, #f1f5f9 45%, #e2e8f0 90%);
+  background-size: 200% 100%;
+  animation: map-shimmer 2.5s ease-in-out infinite;
+}
+
+@keyframes map-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
