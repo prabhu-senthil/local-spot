@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Express App",
+      "program": "/Users/renumacbook/Documents/Prabhu - Git/local-spot/server/server.js",
+      "restart": true,
+      "console": "integratedTerminal"
+    }
+  ]
+}
