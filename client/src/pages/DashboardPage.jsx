@@ -1,5 +1,18 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { useAuth } from "../contexts/AuthContext";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "";
+const CATEGORY_MAP = {
+  restaurants: "13065",
+  nightlife: "13003",
+  shopping: "17000",
+  coffee: "13032",
+  services: "17100",
+  outdoors: "16000",
+};
 
 const CATEGORIES = [
   { id: "restaurants", label: "Restaurants", icon: "🍽️" },
@@ -8,57 +21,6 @@ const CATEGORIES = [
   { id: "services", label: "Services", icon: "💇" },
   { id: "coffee", label: "Coffee & Tea", icon: "☕" },
   { id: "outdoors", label: "Parks", icon: "🌳" },
-];
-
-const MOCK_VENUES = [
-  {
-    id: "1",
-    name: "Harbor Bistro",
-    category: "Seafood · Downtown",
-    rating: 4.5,
-    reviews: 428,
-    price: "$$",
-    open: true,
-    distance: "0.3 mi",
-    image:
-      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=260&fit=crop",
-  },
-  {
-    id: "2",
-    name: "Neon Noodle Bar",
-    category: "Asian Fusion · Arts District",
-    rating: 4.7,
-    reviews: 891,
-    price: "$$",
-    open: true,
-    distance: "0.8 mi",
-    image:
-      "https://images.unsplash.com/photo-1552566626-52f8dd828a9c?w=400&h=260&fit=crop",
-  },
-  {
-    id: "3",
-    name: "Copper Oak Tavern",
-    category: "American · Old Town",
-    rating: 4.2,
-    reviews: 203,
-    price: "$$$",
-    open: false,
-    distance: "1.1 mi",
-    image:
-      "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=260&fit=crop",
-  },
-  {
-    id: "4",
-    name: "Velvet Lounge",
-    category: "Cocktail Bar · Waterfront",
-    rating: 4.6,
-    reviews: 312,
-    price: "$$$",
-    open: true,
-    distance: "1.4 mi",
-    image:
-      "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=400&h=260&fit=crop",
-  },
 ];
 
 const MOCK_REVIEWS = [
@@ -102,15 +64,149 @@ function StarRow({ value, size = "sm" }) {
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const [search, setSearch] = useState("");
-  const [location, setLocation] = useState("San Francisco, CA");
+  const [location, setLocation] = useState("");
   const [activeCategory, setActiveCategory] = useState("restaurants");
+  const [coords, setCoords] = useState(null);
+  const [venues, setVenues] = useState([]);
+  const [venuesLoading, setVenuesLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [error, setError] = useState("");
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
 
-  const initials = (user?.name || "U")
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const initials = useMemo(
+    () =>
+      (user?.name || "U")
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase(),
+    [user?.name]
+  );
+
+  const fetchCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setError("");
+        setLocating(false);
+      },
+      (geoError) => {
+        setError(geoError?.message || "Could not access your location.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  useEffect(() => {
+    fetchCurrentLocation();
+  }, []);
+
+  useEffect(() => {
+    if (!coords || !MAPBOX_TOKEN) return;
+    const controller = new AbortController();
+    const loadPlaceName = async () => {
+      try {
+        const geocodeUrl = new URL(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json`
+        );
+        geocodeUrl.searchParams.set("access_token", MAPBOX_TOKEN);
+        geocodeUrl.searchParams.set("types", "place,locality,region");
+        geocodeUrl.searchParams.set("limit", "1");
+        const response = await fetch(geocodeUrl, { signal: controller.signal });
+        if (!response.ok) return;
+        const data = await response.json();
+        setLocation(data.features?.[0]?.place_name || "");
+      } catch {
+        // ignore reverse geocode errors
+      }
+    };
+    loadPlaceName();
+    return () => controller.abort();
+  }, [coords]);
+
+  useEffect(() => {
+    if (!coords) return;
+    const controller = new AbortController();
+    const loadVenues = async () => {
+      setVenuesLoading(true);
+      setError("");
+      try {
+        const url = new URL(`${API_URL}/api/venues`);
+        url.searchParams.set("lat", String(coords.lat));
+        url.searchParams.set("lng", String(coords.lng));
+        url.searchParams.set("radius", "4000");
+        url.searchParams.set("limit", "20");
+        url.searchParams.set("categoryId", CATEGORY_MAP[activeCategory] || "13065");
+        if (search.trim()) url.searchParams.set("query", search.trim());
+        const response = await fetch(url, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.message || "Failed to load nearby venues.");
+        setVenues(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message || "Failed to load venues.");
+          setVenues([]);
+        }
+      } finally {
+        setVenuesLoading(false);
+      }
+    };
+    loadVenues();
+    return () => controller.abort();
+  }, [coords, activeCategory, search]);
+
+  useEffect(() => {
+    if (!coords || !MAPBOX_TOKEN || !mapContainerRef.current || mapRef.current) return;
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    mapRef.current = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [coords.lng, coords.lat],
+      zoom: 13,
+    });
+    mapRef.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    return () => {
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  }, [coords]);
+
+  useEffect(() => {
+    if (!mapRef.current || !coords) return;
+    mapRef.current.setCenter([coords.lng, coords.lat]);
+  }, [coords]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+    venues.forEach((v) => {
+      if (typeof v.longitude !== "number" || typeof v.latitude !== "number") return;
+      const marker = new mapboxgl.Marker({ color: "#d32323" })
+        .setLngLat([v.longitude, v.latitude])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 12 }).setHTML(
+            `<strong>${v.name}</strong><br/><span>${v.address || ""}</span>`
+          )
+        )
+        .addTo(mapRef.current);
+      markersRef.current.push(marker);
+    });
+  }, [venues]);
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -162,16 +258,17 @@ export function DashboardPage() {
               <input
                 type="text"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="City, neighborhood, or ZIP"
+                readOnly
+                placeholder="Detecting location..."
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
             <button
               type="button"
+              onClick={fetchCurrentLocation}
               className="shrink-0 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
             >
-              Search
+              {locating ? "Locating..." : "Use my location"}
             </button>
           </div>
 
@@ -236,7 +333,9 @@ export function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">The best {CATEGORIES.find((c) => c.id === activeCategory)?.label.toLowerCase() || "places"} near you</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Browse reviews, photos, and hours—styled like a local discovery feed.
+              {location
+                ? `Showing places around ${location}`
+                : "Use your exact location to load nearby venues."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -270,62 +369,60 @@ export function DashboardPage() {
               </div>
             </aside>
 
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+            {venuesLoading && <p className="text-sm text-slate-500">Loading nearby venues...</p>}
             <ul className="space-y-4">
-              {MOCK_VENUES.map((v) => (
+              {!venuesLoading && venues.length === 0 && (
+                <li className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-card">
+                  No venues found for this location/filter.
+                </li>
+              )}
+              {venues.map((v) => (
                 <li key={v.id}>
                   <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card transition hover:shadow-lift">
-                    <div className="flex flex-col sm:flex-row">
-                      <div className="relative h-44 shrink-0 sm:h-auto sm:w-52">
-                        <img src={v.image} alt="" className="h-full w-full object-cover" loading="lazy" />
-                        <button
-                          type="button"
-                          className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-slate-600 shadow hover:text-brand"
-                          aria-label="Save"
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                            />
-                          </svg>
-                        </button>
-                      </div>
+                    <div className="flex">
                       <div className="flex flex-1 flex-col p-4">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
                             <h2 className="text-lg font-bold text-slate-900 hover:text-brand cursor-pointer">{v.name}</h2>
                             <p className="text-sm text-slate-600">{v.category}</p>
+                            {v.address && <p className="mt-1 text-xs text-slate-500">{v.address}</p>}
                           </div>
                           <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                            {v.distance}
+                            {v.distanceText || "--"}
                           </span>
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                          <StarRow value={v.rating} />
-                          <span className="text-slate-600">
-                            {v.rating} ({v.reviews} reviews)
-                          </span>
-                          <span className="text-slate-400">·</span>
-                          <span className="font-medium text-slate-700">{v.price}</span>
-                          <span className="text-slate-400">·</span>
-                          <span className={v.open ? "font-medium text-emerald-600" : "font-medium text-amber-600"}>
-                            {v.open ? "Open now" : "Closed"}
-                          </span>
+                          {typeof v.rating === "number" ? (
+                            <>
+                              <StarRow value={v.rating} />
+                              <span className="text-slate-600">{v.rating.toFixed(1)} / 5</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-400">No rating yet</span>
+                          )}
+                          {v.price && (
+                            <>
+                              <span className="text-slate-400">·</span>
+                              <span className="font-medium text-slate-700">{v.price}</span>
+                            </>
+                          )}
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2">
                           <button
                             type="button"
                             className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+                            onClick={() => {
+                              if (mapRef.current && typeof v.longitude === "number" && typeof v.latitude === "number") {
+                                mapRef.current.flyTo({ center: [v.longitude, v.latitude], zoom: 15 });
+                              }
+                            }}
                           >
-                            View details
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                          >
-                            Write a review
+                            View on map
                           </button>
                         </div>
                       </div>
@@ -360,34 +457,13 @@ export function DashboardPage() {
           {/* Map column — Yelp-style sticky map */}
           <aside className="lg:sticky lg:top-24 lg:self-start">
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-              <div className="map-placeholder relative aspect-[4/3] w-full lg:aspect-auto lg:min-h-[420px]">
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-                  <div className="rounded-full bg-white/90 p-3 shadow-md">
-                    <svg className="h-8 w-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
-                      />
-                    </svg>
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-slate-700">Map view</p>
-                  <p className="mt-1 max-w-[220px] text-xs text-slate-500">
-                    Pin your search results here. Wire this panel to Mapbox or your venues API when ready.
-                  </p>
+              {MAPBOX_TOKEN ? (
+                <div ref={mapContainerRef} className="h-[420px] w-full" />
+              ) : (
+                <div className="p-4 text-sm text-amber-700">
+                  Missing <code>VITE_MAPBOX_ACCESS_TOKEN</code>. Add it in your client env file.
                 </div>
-                {/* Fake pins */}
-                <span className="absolute left-[28%] top-[35%] flex h-8 w-8 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full bg-brand text-white shadow-lg ring-2 ring-white">
-                  <span className="text-xs font-bold">1</span>
-                </span>
-                <span className="absolute left-[55%] top-[48%] flex h-8 w-8 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full bg-slate-800 text-white shadow-lg ring-2 ring-white">
-                  <span className="text-xs font-bold">2</span>
-                </span>
-                <span className="absolute left-[72%] top-[40%] flex h-8 w-8 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full bg-slate-800 text-white shadow-lg ring-2 ring-white">
-                  <span className="text-xs font-bold">3</span>
-                </span>
-              </div>
+              )}
               <div className="border-t border-slate-100 p-3">
                 <p className="text-center text-xs text-slate-500">Showing results near {location}</p>
               </div>
