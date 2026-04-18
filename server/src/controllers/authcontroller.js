@@ -12,7 +12,7 @@ function generateToken(user) {
 
 export async function register(req, res, _next) {
   console.log("Registering user with data:", req.body);
-  const { name, email, password } = req.body;
+  const { name, email, password, role } = req.body;
 
   try {
     if (!name || !email || !password) {
@@ -26,11 +26,14 @@ export async function register(req, res, _next) {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    const validRoles = ["user", "reviewer", "admin", "restaurant_owner"];
+    const assignedRole = validRoles.includes(role) ? role : "user";
+
     const user = await User.create({
       name: String(name).trim(),
       email: emailLower,
       passwordHash,
-      role: "user",
+      role: assignedRole,
       reviewsCount: 0,
     });
 

@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     role: {
       type: String,
-      enum: ["user", "reviewer", "admin", "owner"],
+      enum: ["user", "reviewer", "admin", "restaurant_owner"],
       default: "user",
     },
     reviewsCount: { type: Number, default: 0 },

@@ -1,13 +1,12 @@
 import express from "express";
 import { protect } from "../middleware/auth.js";
-import { login, me, register } from "../controllers/authcontroller.js";
+import { login, me, register, init } from "../controllers/authcontroller.js";
+import { validateRegisterInput } from "../middleware/validate.js";
 
 const router = express.Router();
 
-router.post("/register", register);
-// router.post("/register", (req, res) => {
-//   res.json({ message: 'User created' });
-// });
+router.get("/register/init", init);
+router.post("/register", validateRegisterInput, register);
 router.post("/login", login);
 router.get("/me", protect, me);
 
