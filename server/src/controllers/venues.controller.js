@@ -1,4 +1,8 @@
+import mongoose from "mongoose";
+import Venue from "../models/Venue.js";
+
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v2/places";
+
 
 function getGeoapifyApiKey() {
   const key = process.env.GEOAPIFY_API_KEY;
@@ -75,9 +79,58 @@ export async function getVenues(req, res, next) {
 
     const data = await response.json();
 
-    const venues = Array.isArray(data.features)
+    /* const venues = Array.isArray(data.features)
       ? data.features.map(mapVenue)
       : [];
+
+    return res.status(200).json(venues); */
+    const venues = [];
+
+    for (const feature of data.features) {
+      const mapped = mapVenue(feature);
+
+      // Check if venue already exists (by name + coordinates)
+      let existing = await Venue.findOne({
+        name: mapped.name,
+        location: {
+          $near: {
+            $geometry: {
+              type: "Point",
+              coordinates: [mapped.longitude, mapped.latitude],
+            },
+            $maxDistance: 10, // meters
+          },
+        },
+      });
+
+      /*     findOne({
+            name: mapped.name,
+            "location.coordinates": [mapped.longitude, mapped.latitude],
+          }); */
+
+      if (!existing) {
+        existing = await Venue.create({
+          name: mapped.name,
+          category: mapped.category,
+          address: mapped.address,
+          location: {
+            type: "Point",
+            coordinates: [mapped.longitude, mapped.latitude],
+          },
+        });
+      }
+
+      //  return MongoDB _id
+      venues.push({
+        _id: existing._id,
+        name: existing.name,
+        category: existing.category,
+        address: existing.address,
+        latitude: mapped.latitude,
+        longitude: mapped.longitude,
+        distanceText: mapped.distanceText,
+      });
+    }
 
     return res.status(200).json(venues);
   } catch (err) {
@@ -86,7 +139,7 @@ export async function getVenues(req, res, next) {
 }
 
 // GET single venue 
-export async function getVenueById(req, res, next) {
+/* export async function getVenueById(req, res, next) {
   try {
     return res.status(501).json({
       message: "Geoapify does not support fetching a single venue by ID.",
@@ -94,4 +147,77 @@ export async function getVenueById(req, res, next) {
   } catch (err) {
     return next(err);
   }
-}
+} */
+
+export const getVenueById = async (req, res, next) => {
+  try {
+    const venueId = new mongoose.Types.ObjectId(req.params.id);
+
+    const result = await Venue.aggregate([
+      { $match: { _id: venueId } },
+
+      {
+        $lookup: {
+          from: "reviews",
+          localField: "_id",
+          foreignField: "venueId",
+          as: "reviews",
+        },
+      },
+      {
+        $lookup: {
+          from: "crowdreports",
+          localField: "_id",
+          foreignField: "venueId",
+          as: "crowdReports",
+        },
+      },
+      {
+        $lookup: {
+          from: "trustscores",
+          localField: "_id",
+          foreignField: "venueId",
+          as: "trust",
+        },
+      },
+      {
+        $addFields: {
+          trustScore: {
+            $arrayElemAt: ["$trust.score", 0],
+          },
+          crowd: {
+            busy: {
+              $size: {
+                $filter: {
+                  input: "$crowdReports",
+                  as: "c",
+                  cond: { $eq: ["$$c.status", "busy"] },
+                },
+              },
+            },
+            quiet: {
+              $size: {
+                $filter: {
+                  input: "$crowdReports",
+                  as: "c",
+                  cond: { $eq: ["$$c.status", "quiet"] },
+                },
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    // Error handling
+    if (result.length === 0) {
+      return res.status(404).json({
+        message: "Venue not found",
+      });
+    }
+
+    res.json(result[0]);
+  } catch (err) {
+    next(err);
+  }
+};

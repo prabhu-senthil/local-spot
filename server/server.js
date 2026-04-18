@@ -4,7 +4,7 @@ import cors from "cors";
 import { connectDB } from "./src/config/db.js";
 
 import healthRoutes from "./src/routes/health.routes.js";
-import authRoutes from "./src/routes/auth.routes.js";
+import authRoutes from "./src/routes/authroutes.js";
 import venuesRoutes from "./src/routes/venues.routes.js";
 import reviewsRoutes from "./src/routes/reviews.routes.js";
 import notificationsRoutes from "./src/routes/notifications.routes.js";

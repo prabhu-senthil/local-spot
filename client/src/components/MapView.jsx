@@ -16,7 +16,7 @@ const MapView = () => {
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // 🗺️ Initialize Map
+  // Initialize Map
   useEffect(() => {
     if (mapRef.current) return;
 
@@ -27,7 +27,7 @@ const MapView = () => {
       zoom: 13,
     });
 
-    // 🔄 Update coords when map moves
+    // Update coords when map moves
     mapRef.current.on("moveend", () => {
       const center = mapRef.current.getCenter();
       setCoords({
@@ -37,7 +37,7 @@ const MapView = () => {
     });
   }, []);
 
-  // 🔥 Fetch venues from YOUR BACKEND
+  // Fetch venues from YOUR BACKEND
   const fetchVenues = async (lng, lat) => {
     try {
       setLoading(true);
@@ -49,11 +49,11 @@ const MapView = () => {
       const data = await res.json();
       setVenues(data);
 
-      // 🧹 Remove old markers
+      // Remove old markers
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
 
-      // 📍 Add new markers
+      // Add new markers
       data.forEach((venue) => {
         const marker = new mapboxgl.Marker()
           .setLngLat([venue.longitude, venue.latitude])
@@ -75,7 +75,7 @@ const MapView = () => {
     }
   };
 
-  // 🔄 Auto fetch when map moves
+  // Auto fetch when map moves
   useEffect(() => {
     fetchVenues(coords.lng, coords.lat);
   }, [coords]);

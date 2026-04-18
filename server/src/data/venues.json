@@ -1,0 +1,83 @@
+[
+  {
+    "name": "The Roost Cafe",
+    "category": "Coffee & Tea",
+    "address": "Main Street, Maynooth, Ireland",
+    "location": {
+      "type": "Point",
+      "coordinates": [-6.593, 53.381]
+    },
+    "avgRating": 4.5,
+    "reviewCount": 120,
+    "tags": ["coffee", "brunch", "cozy"],
+    "openingHours": {
+      "monday": { "open": "08:00", "close": "18:00" },
+      "tuesday": { "open": "08:00", "close": "18:00" },
+      "wednesday": { "open": "08:00", "close": "18:00" },
+      "thursday": { "open": "08:00", "close": "18:00" },
+      "friday": { "open": "08:00", "close": "20:00" },
+      "saturday": { "open": "09:00", "close": "20:00" },
+      "sunday": { "open": "09:00", "close": "17:00" }
+    },
+    "images": ["https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb"],
+    "crowdSummary": {
+      "bestHours": [9, 10, 11],
+      "peakHours": [12, 13, 14]
+    }
+  },
+  {
+    "name": "Apache Pizza Maynooth",
+    "category": "Restaurant",
+    "address": "Straffan Road, Maynooth",
+    "location": {
+      "type": "Point",
+      "coordinates": [-6.585, 53.377]
+    },
+    "avgRating": 4.2,
+    "reviewCount": 200,
+    "tags": ["pizza", "fast food", "delivery"],
+    "openingHours": {
+      "monday": { "open": "12:00", "close": "23:00" },
+      "tuesday": { "open": "12:00", "close": "23:00" },
+      "wednesday": { "open": "12:00", "close": "23:00" },
+      "thursday": { "open": "12:00", "close": "23:00" },
+      "friday": { "open": "12:00", "close": "01:00" },
+      "saturday": { "open": "12:00", "close": "01:00" },
+      "sunday": { "open": "12:00", "close": "23:00" }
+    },
+    "images": ["https://images.unsplash.com/photo-1513104890138-7c749659a591"],
+    "crowdSummary": {
+      "bestHours": [14, 15],
+      "peakHours": [19, 20, 21]
+    }
+  },
+  {
+  "name": "Picaderos",
+  "category": "Restaurant",
+  "address": "Main Street, Maynooth, Co. Kildare, Ireland",
+  "location": {
+    "type": "Point",
+    "coordinates": [-6.5928, 53.3812]
+  },
+  "avgRating": 4.3,
+  "reviewCount": 180,
+  "tags": ["mexican", "casual dining", "takeaway", "family-friendly"],
+  "openingHours": {
+    "monday": { "open": "12:00", "close": "22:00" },
+    "tuesday": { "open": "12:00", "close": "22:00" },
+    "wednesday": { "open": "12:00", "close": "22:00" },
+    "thursday": { "open": "12:00", "close": "22:00" },
+    "friday": { "open": "12:00", "close": "23:00" },
+    "saturday": { "open": "12:00", "close": "23:00" },
+    "sunday": { "open": "13:00", "close": "21:00" }
+  },
+  "images": [
+    "https://images.unsplash.com/photo-1600891964599-f61ba0e24092",
+    "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b"
+  ],
+  "crowdSummary": {
+    "bestHours": [14, 15, 16],
+    "peakHours": [19, 20, 21]
+  }
+}
+]

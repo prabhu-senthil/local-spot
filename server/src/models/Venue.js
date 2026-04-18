@@ -1,4 +1,4 @@
-// models/Venue.js
+
 import mongoose from "mongoose";
 
 const venueSchema = new mongoose.Schema(
