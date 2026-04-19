@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const CrowdSchema = new mongoose.Schema({
 
@@ -19,4 +19,4 @@ const CrowdSchema = new mongoose.Schema({
 
 });
 
-module.exports = mongoose.model("CrowdReport",CrowdSchema);
+export default mongoose.model("CrowdReport", CrowdSchema);

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import Role from "../models/roles.js";
 
 function generateToken(user) {
   return jwt.sign(
@@ -82,4 +83,19 @@ export async function login(req, res, _next) {
 export async function me(req, res) {
   return res.status(200).json(req.user);
 }
+
+export async function init(req, res) {
+  try {
+    const roleDoc = await Role.findOne();
+    if (!roleDoc || !roleDoc.roles) {
+      return res.status(200).json({ roles: ["user", "reviewer", "admin", "restaurant_owner"] });
+    }
+    const mappedRoles = roleDoc.roles.map(r => r.toLowerCase().replace("-", "_"));
+    return res.status(200).json({ roles: mappedRoles, displayRoles: roleDoc.roles });
+  } catch (error) {
+    console.error("Error fetching roles:", error);
+    return res.status(500).json({ message: "Server error fetching roles" });
+  }
+}
+
 

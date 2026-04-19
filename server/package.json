@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "seed": "node src/seed/seedVenues.js"
+    "seed": "node src/seed/seedVenues.js",
+    "test": "vitest run"
   },
   "dependencies": {
+    "axios": "^1.15.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -17,6 +19,9 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.0",
     "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.4"
   }
 }
-
