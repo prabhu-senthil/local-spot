@@ -38,7 +38,7 @@ export async function createCrowdReport(req, res) {
     await CrowdAnalytics.findOneAndUpdate(
       { venueId, hour, dayOfWeek },
       updateQuery,
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
 
     return res.status(201).json(newReport);

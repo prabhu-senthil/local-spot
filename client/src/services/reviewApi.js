@@ -10,3 +10,12 @@ export const submitReview = async (reviewData, token) => {
   });
   return res.data;
 };
+
+export const voteOnReview = async (reviewId, voteType, token) => {
+  const res = await axios.post(`${API_URL}/api/reviews/${reviewId}/vote`, { voteType }, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+  return res.data;
+};

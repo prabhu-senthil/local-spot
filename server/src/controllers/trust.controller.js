@@ -47,7 +47,7 @@ export const calculateTrust = async (venueId) => {
     const updatedTrustScore = await TrustScore.findOneAndUpdate(
       { venueId },
       { score: trustScoreValue, lastCalculated: Date.now() },
-      { new: true, upsert: true }
+      { returnDocument: "after", upsert: true }
     );
 
     return updatedTrustScore;

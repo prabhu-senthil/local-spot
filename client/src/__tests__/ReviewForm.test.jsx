@@ -53,7 +53,8 @@ describe("ReviewForm", () => {
         venueId: "123",
         rating: 5,
         reviewText: "Amazing experience!",
-        crowdLevel: "moderate" // default
+        crowdLevel: "moderate", // default
+        images: []
       }, "abc");
       expect(mockOnSubmit).toHaveBeenCalledWith({ _id: "rev1", rating: 5 });
     });

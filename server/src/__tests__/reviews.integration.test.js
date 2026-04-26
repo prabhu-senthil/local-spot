@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import request from "supertest";
 import express from "express";
 import mongoose from "mongoose";
@@ -19,12 +19,16 @@ describe("Reviews Integration", () => {
     vi.mock("../models/Review.js", () => ({
       default: {
         create: vi.fn().mockResolvedValue({ _id: "123", rating: 5 }),
-        find: vi.fn().mockReturnValue({
-          sort: vi.fn().mockReturnValue({
+        findOne: vi.fn().mockResolvedValue(null),
+        find: vi.fn().mockReturnValue(Object.assign(
+          Promise.resolve([{ rating: 5 }]),
+          {
+            sort: vi.fn().mockReturnValue({
+              lean: vi.fn().mockResolvedValue([]),
+            }),
             lean: vi.fn().mockResolvedValue([]),
-          }),
-          lean: vi.fn().mockResolvedValue([]),
-        }),
+          }
+        )),
       },
     }));
     vi.mock("../models/TrustScore.js", () => ({
@@ -33,9 +37,26 @@ describe("Reviews Integration", () => {
         findOne: vi.fn().mockResolvedValue({ score: 100 }),
       },
     }));
+    vi.mock("../models/User.js", () => ({
+      default: {
+        findById: vi.fn().mockImplementation((id) => ({
+          select: vi.fn().mockResolvedValue({ _id: id, role: "user" })
+        })),
+        findByIdAndUpdate: vi.fn().mockResolvedValue({ _id: "123" })
+      },
+    }));
+    vi.mock("../models/Venue.js", () => ({
+      default: {
+        findById: vi.fn().mockResolvedValue({ _id: "v123", reviewCount: 0, avgRating: 0 }),
+        findByIdAndUpdate: vi.fn().mockResolvedValue({ _id: "v123" })
+      }
+    }));
   });
 
-  const validToken = jwt.sign({ id: new mongoose.Types.ObjectId().toString(), role: "user" }, process.env.JWT_SECRET || "fallback_secret", { expiresIn: "1h" });
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = "fallback_secret";
+  }
+  const validToken = jwt.sign({ id: new mongoose.Types.ObjectId().toString(), role: "user" }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
   it("should reject unauthenticated requests", async () => {
     const res = await request(app).post("/api/reviews").send({
@@ -70,6 +91,9 @@ describe("Reviews Integration", () => {
       });
     
     // In our mock, it returns status 201
+    if (res.status !== 201) {
+      console.log("reviews res.body", res.body);
+    }
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty("_id", "123");
   });

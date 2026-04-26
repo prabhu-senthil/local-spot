@@ -14,13 +14,13 @@ vi.mock("../contexts/AuthContext", () => ({
 }));
 
 // Mock Recharts so jsdom doesn't complain about SVGs
-vi.mock("recharts", () => {
-  const Original = vi.importActual("recharts");
+vi.mock("recharts", async () => {
+  const actual = await vi.importActual("recharts");
   return {
-    ...Original,
+    ...actual,
     ResponsiveContainer: ({ children }) => <div data-testid="responsive-container">{children}</div>,
-    BarChart: () => <div data-testid="bar-chart" />,
-    LineChart: () => <div data-testid="line-chart" />
+    BarChart: ({ children }) => <div data-testid="bar-chart">{children}</div>,
+    LineChart: ({ children }) => <div data-testid="line-chart">{children}</div>,
   };
 });
 
@@ -31,12 +31,13 @@ describe("AnalyticsDashboard", () => {
 
   it("should restrict access to non-owners", () => {
     useAuth.mockReturnValue({ user: { role: "user" }, token: "abc" });
+    analyticsApi.getOwnerDashboard.mockReturnValue(new Promise(() => {}));
     render(
       <BrowserRouter>
         <AnalyticsDashboard />
       </BrowserRouter>
     );
-    expect(screen.getByText("You must be an owner to view this page.")).toBeDefined();
+    expect(screen.getByText("You must be an owner or admin to view this page.")).toBeDefined();
   });
 
   it("should render loading state initially for owners", () => {
@@ -56,6 +57,7 @@ describe("AnalyticsDashboard", () => {
   it("should render dashboard data when loaded", async () => {
     useAuth.mockReturnValue({ user: { role: "owner" }, token: "abc" });
     analyticsApi.getOwnerDashboard.mockResolvedValue({
+      restaurantInfo: { name: "Test Venue", category: "Cafe" },
       overview: { totalVenues: 2, globalAvgRating: 4.5, totalReviews: 15 },
       topVenues: [],
       crowdTrends: []

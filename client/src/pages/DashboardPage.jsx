@@ -305,7 +305,7 @@ export function DashboardPage() {
                   Global Dashboard
                 </Link>
               )}
-              {user?.role === "restaurant_owner" && (
+              {user?.role === "owner" && (
                 <Link
                   to="/owner/dashboard"
                   className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100"

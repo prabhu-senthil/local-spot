@@ -23,11 +23,22 @@ describe("Crowd Integration", () => {
         findOneAndUpdate: vi.fn().mockResolvedValue({ totalReports: 1, busyCount: 1 }),
       },
     }));
+    vi.mock("../models/User.js", () => ({
+      default: {
+        findById: vi.fn().mockImplementation((id) => ({
+          select: vi.fn().mockResolvedValue({ _id: id, role: "user" })
+        })),
+      },
+    }));
   });
+
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = "fallback_secret";
+  }
 
   const validToken = jwt.sign(
     { id: new mongoose.Types.ObjectId().toString(), role: "user" },
-    process.env.JWT_SECRET || "fallback_secret",
+    process.env.JWT_SECRET,
     { expiresIn: "1h" }
   );
 

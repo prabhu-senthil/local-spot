@@ -10,6 +10,7 @@ import reviewsRoutes from "./src/routes/reviews.routes.js";
 import notificationsRoutes from "./src/routes/notifications.routes.js";
 import analyticsRoutes from "./src/routes/analytics.routes.js";
 import crowdRoutes from "./src/routes/crowd.routes.js";
+import uploadRoutes from "./src/routes/upload.routes.js";
 
 import errorHandler from "./src/middleware/errorHandler.js";
 
@@ -35,6 +36,7 @@ app.use("/api/reviews", reviewsRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/crowd", crowdRoutes);
+app.use("/api/upload", uploadRoutes);
 
 app.use(errorHandler);
 
@@ -43,4 +45,6 @@ await connectDB();
 app.listen(PORT, () => {
   console.log(`Backend started on port ${PORT}`);
 });
+
+export default app;
 

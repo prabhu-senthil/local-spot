@@ -3,12 +3,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getVenueDetails } from "../services/venueApi";
 import { 
   ArrowLeft, MapPin, Star, Clock, AlertCircle, 
-  Users, Activity, ShieldCheck, CheckCircle2
+  Users, Activity, ShieldCheck, CheckCircle2,
+  ThumbsUp, ThumbsDown
 } from "lucide-react";
 import ReviewForm from "./ReviewForm";
 import CrowdReportToggle from "./CrowdReportToggle";
 import { useAuth } from "../contexts/AuthContext";
 import { claimVenue } from "../services/venueApi";
+import { voteOnReview } from "../services/reviewApi";
 
 export default function VenueDetails() {
   const { id } = useParams();
@@ -19,6 +21,19 @@ export default function VenueDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [claiming, setClaiming] = useState(false);
+
+  const handleVote = async (reviewId, voteType) => {
+    if (!token) return;
+    try {
+      const updatedReview = await voteOnReview(reviewId, voteType, token);
+      setVenue((prev) => ({
+        ...prev,
+        reviews: prev.reviews.map(r => r._id === reviewId ? updatedReview : r)
+      }));
+    } catch (err) {
+      console.error("Failed to vote:", err);
+    }
+  };
 
   useEffect(() => {
     const fetchVenue = async () => {
@@ -149,7 +164,7 @@ export default function VenueDetails() {
           </div>
         </div>
 
-        {user?.role === "restaurant_owner" && !venue.ownerId && (
+        {user?.role === "owner" && !venue.ownerId && (
           <div className="mt-6">
             <button 
               onClick={async () => {
@@ -217,7 +232,48 @@ export default function VenueDetails() {
                           <p className="text-xs text-slate-400 mt-0.5">Verified Visit</p>
                         </div>
                       </div>
-                      <p className="text-slate-600 text-sm leading-relaxed">{r.reviewText || "No comment provided."}</p>
+                      <p className="text-slate-600 text-sm leading-relaxed mb-3">{r.reviewText || "No comment provided."}</p>
+                      
+                      {r.images && r.images.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2 mb-3">
+                          {r.images.map((imgUrl, i) => (
+                            <img 
+                              key={i} 
+                              src={imgUrl} 
+                              alt={`Review photo ${i + 1}`} 
+                              className="w-20 h-20 md:w-24 md:h-24 object-cover rounded-lg border border-slate-200"
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Upvote / Downvote */}
+                      <div className="flex items-center gap-4 mt-2">
+                        <button 
+                          onClick={() => handleVote(r._id, 'upvote')}
+                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition ${
+                            user && r.upvotes?.includes(user.id) 
+                              ? 'bg-blue-50 text-blue-600' 
+                              : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                          }`}
+                          disabled={!user}
+                        >
+                          <ThumbsUp className="w-4 h-4" />
+                          <span>{r.upvotes?.length || 0}</span>
+                        </button>
+                        <button 
+                          onClick={() => handleVote(r._id, 'downvote')}
+                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition ${
+                            user && r.downvotes?.includes(user.id) 
+                              ? 'bg-red-50 text-red-600' 
+                              : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                          }`}
+                          disabled={!user}
+                        >
+                          <ThumbsDown className="w-4 h-4" />
+                          <span>{r.downvotes?.length || 0}</span>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -229,17 +285,23 @@ export default function VenueDetails() {
               )}
 
               {user ? (
-                <ReviewForm 
-                  venueId={venue._id} 
-                  token={token} 
-                  onReviewSubmitted={(newReview) => {
-                    setVenue(prev => ({
-                      ...prev,
-                      reviews: [newReview, ...(prev.reviews || [])],
-                      reviewCount: (prev.reviewCount || 0) + 1
-                    }));
-                  }}
-                />
+                user.role === "owner" ? (
+                  <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-center text-sm text-amber-700">
+                    <p>Restaurant owners cannot submit reviews.</p>
+                  </div>
+                ) : (
+                  <ReviewForm 
+                    venueId={venue._id} 
+                    token={token} 
+                    onReviewSubmitted={(newReview) => {
+                      setVenue(prev => ({
+                        ...prev,
+                        reviews: [newReview, ...(prev.reviews || [])],
+                        reviewCount: (prev.reviewCount || 0) + 1
+                      }));
+                    }}
+                  />
+                )
               ) : (
                 <div className="mt-6 p-4 bg-slate-100 rounded-xl text-center text-sm text-slate-600">
                   <p>Please log in to leave a review.</p>

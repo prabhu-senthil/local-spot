@@ -1,9 +1,10 @@
 import Venue from "../models/Venue.js";
 import CrowdAnalytics from "../models/CrowdAnalytics.js";
+import Review from "../models/Review.js";
 
 export async function getOwnerDashboard(req, res) {
   try {
-    const isOwner = req.user.role === "restaurant_owner";
+    const isOwner = req.user.role === "owner";
     const isAdmin = req.user.role === "admin";
     const ownerId = req.user.id;
 
@@ -21,21 +22,37 @@ export async function getOwnerDashboard(req, res) {
         overview: { totalVenues: 0, globalAvgRating: 0, totalReviews: 0 },
         topVenues: [],
         crowdTrends: [],
+        allVenues: [],
+        recentReviews: [],
+        restaurantInfo: null
       });
     }
 
     const venueIds = venues.map((v) => v._id);
+    let restaurantInfo = null;
+
+    if (isOwner && venues.length > 0) {
+      const primaryVenue = venues[0];
+      restaurantInfo = {
+        name: primaryVenue.name,
+        image: primaryVenue.images && primaryVenue.images.length > 0 ? primaryVenue.images[0] : null,
+        category: primaryVenue.category
+      };
+    }
 
     // 2. Overview Stats
     const totalVenues = venues.length;
     let globalAvgRating = 0;
-    let totalReviews = 0;
+    
+    // Fetch exact review count directly from the Reviews collection
+    const totalReviews = await Review.countDocuments(isAdmin ? {} : { venueId: { $in: venueIds } });
     
     if (venues.length > 0) {
-      totalReviews = venues.reduce((acc, v) => acc + (v.reviewCount || 0), 0);
       const totalRatingSum = venues.reduce((acc, v) => acc + (v.avgRating || 0) * (v.reviewCount || 0), 0);
-      if (totalReviews > 0) {
-        globalAvgRating = totalRatingSum / totalReviews;
+      const cachedReviewSum = venues.reduce((acc, v) => acc + (v.reviewCount || 0), 0);
+      
+      if (cachedReviewSum > 0) {
+        globalAvgRating = totalRatingSum / cachedReviewSum;
       } else {
         globalAvgRating = venues.reduce((acc, v) => acc + (v.avgRating || 0), 0) / venues.length;
       }
@@ -76,6 +93,14 @@ export async function getOwnerDashboard(req, res) {
       });
     }
 
+    // 5. Fetch recent reviews for detailed view
+    const allReviews = await Review.find({ venueId: { $in: venueIds } })
+      .populate("userId", "name email")
+      .populate("venueId", "name")
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
     return res.status(200).json({
       overview: {
         totalVenues,
@@ -83,7 +108,24 @@ export async function getOwnerDashboard(req, res) {
         totalReviews
       },
       topVenues,
-      crowdTrends
+      crowdTrends,
+      allVenues: venues.map(v => ({
+        _id: v._id,
+        name: v.name,
+        category: v.category,
+        address: v.address,
+        avgRating: Math.round((v.avgRating || 0) * 10) / 10,
+        reviewCount: v.reviewCount || 0
+      })),
+      recentReviews: allReviews.map(r => ({
+        _id: r._id,
+        venueName: r.venueId?.name || "Unknown Venue",
+        userName: r.userId?.name || "Anonymous",
+        rating: r.rating,
+        text: r.reviewText,
+        createdAt: r.createdAt
+      })),
+      restaurantInfo
     });
   } catch (error) {
     console.error("Dashboard error:", error);

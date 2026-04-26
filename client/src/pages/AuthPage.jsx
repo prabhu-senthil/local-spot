@@ -69,10 +69,11 @@ export function AuthPage() {
 
     setSubmitting(true);
     try {
+      let userData;
       if (mode === "login") {
-        await login({ email: form.email, password: form.password });
+        userData = await login({ email: form.email, password: form.password });
       } else {
-        await register({
+        userData = await register({
           name: form.name,
           email: form.email,
           password: form.password,
@@ -80,7 +81,11 @@ export function AuthPage() {
         });
       }
 
-      navigate("/dashboard", { replace: true });
+      if (userData.role === 'owner' || userData.role === 'admin') {
+        navigate("/owner/dashboard", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
     } catch (err) {
       setLocalError(err.message || "Authentication failed.");
     } finally {

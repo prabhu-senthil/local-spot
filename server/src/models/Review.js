@@ -41,9 +41,23 @@ const reviewSchema = new mongoose.Schema(
       default: 0.5,
     },
 
-    helpfulVotes: {
-      type: Number,
-      default: 0,
+    upvotes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      }
+    ],
+
+    downvotes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      }
+    ],
+
+    images: {
+      type: [String],
+      default: [],
     },
   },
   { timestamps: true }

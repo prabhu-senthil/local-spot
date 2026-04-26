@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Star } from "lucide-react";
 import { submitReview } from "../services/reviewApi";
+import PhotoUpload from "./PhotoUpload";
 
 export default function ReviewForm({ venueId, token, onReviewSubmitted }) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [crowdLevel, setCrowdLevel] = useState("moderate");
+  const [images, setImages] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,12 +27,14 @@ export default function ReviewForm({ venueId, token, onReviewSubmitted }) {
         venueId,
         rating,
         reviewText,
-        crowdLevel
+        crowdLevel,
+        images
       }, token);
       
       setRating(0);
       setReviewText("");
       setCrowdLevel("moderate");
+      setImages([]);
       if (onReviewSubmitted) {
         onReviewSubmitted(newReview);
       }
@@ -107,6 +111,17 @@ export default function ReviewForm({ venueId, token, onReviewSubmitted }) {
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
           ></textarea>
+        </div>
+
+        {/* Photos */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Add Photos (Optional)</label>
+          <PhotoUpload 
+            token={token} 
+            onUploadComplete={(urls) => setImages(urls)} 
+            maxPhotos={3} 
+            currentPhotos={images}
+          />
         </div>
 
         <button

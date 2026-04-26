@@ -27,7 +27,7 @@ export async function register(req, res, _next) {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    const validRoles = ["user", "reviewer", "admin", "restaurant_owner"];
+    const validRoles = ["user", "reviewer", "admin", "owner"];
     const assignedRole = validRoles.includes(role) ? role : "user";
 
     const user = await User.create({
@@ -88,10 +88,20 @@ export async function init(req, res) {
   try {
     const roleDoc = await Role.findOne();
     if (!roleDoc || !roleDoc.roles) {
-      return res.status(200).json({ roles: ["user", "reviewer", "admin", "restaurant_owner"] });
+      return res.status(200).json({ roles: ["user", "reviewer", "admin", "owner"] });
     }
-    const mappedRoles = roleDoc.roles.map(r => r.toLowerCase().replace("-", "_"));
-    return res.status(200).json({ roles: mappedRoles, displayRoles: roleDoc.roles });
+    let rawRoles = roleDoc.roles;
+    // Inject 'Reviewer' if missing from database
+    if (!rawRoles.some(r => r.toLowerCase() === 'reviewer')) {
+      rawRoles.push('Reviewer');
+    }
+
+    const mappedRoles = rawRoles.map(r => {
+      const lower = r.toLowerCase();
+      if (lower === "restaurant-owner" || lower === "restaurant_owner") return "owner";
+      return lower.replace("-", "_");
+    });
+    return res.status(200).json({ roles: mappedRoles, displayRoles: rawRoles });
   } catch (error) {
     console.error("Error fetching roles:", error);
     return res.status(500).json({ message: "Server error fetching roles" });

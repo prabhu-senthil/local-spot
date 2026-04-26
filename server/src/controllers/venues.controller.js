@@ -209,11 +209,52 @@ export const claimVenue = async (req, res, next) => {
       return res.status(403).json({ message: "This venue has already been claimed." });
     }
     
+    // Check if the user already owns a venue
+    const existingVenue = await Venue.findOne({ ownerId: req.user.id });
+    if (existingVenue) {
+      console.warn(`[Claim Venue Warning] User ${req.user.id} attempted to claim multiple venues.`);
+      return res.status(403).json({ message: "You can only claim one restaurant." });
+    }
+    
     venue.ownerId = req.user.id;
     await venue.save();
     
     res.status(200).json({ message: "Venue claimed successfully", venue });
   } catch (err) {
+    console.error(`[Claim Venue Error] Failed to claim venue: ${err.message}`, err);
+    next(err);
+  }
+};
+
+export const updateVenueImage = async (req, res, next) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) {
+      return res.status(400).json({ message: "Image URL is required" });
+    }
+
+    const venue = await Venue.findById(req.params.id);
+    if (!venue) {
+      return res.status(404).json({ message: "Venue not found" });
+    }
+
+    // Verify ownership
+    if (venue.ownerId?.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You don't have permission to update this venue." });
+    }
+
+    // Since we're using Cloudinary, we just need to replace the first image in the array
+    if (!venue.images) {
+      venue.images = [];
+    }
+    
+    // Set as the primary image (index 0)
+    venue.images[0] = imageUrl;
+    await venue.save();
+
+    res.status(200).json({ message: "Venue image updated successfully", venue });
+  } catch (err) {
+    console.error("Error updating venue image:", err);
     next(err);
   }
 };

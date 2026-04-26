@@ -33,6 +33,23 @@ describe("Analytics Integration", () => {
       },
     }));
 
+    vi.mock("../models/Review.js", () => ({
+      default: {
+        countDocuments: vi.fn().mockResolvedValue(15),
+        find: vi.fn().mockReturnValue({
+          populate: vi.fn().mockReturnValue({
+            populate: vi.fn().mockReturnValue({
+              sort: vi.fn().mockReturnValue({
+                limit: vi.fn().mockReturnValue({
+                  lean: vi.fn().mockResolvedValue([])
+                })
+              })
+            })
+          })
+        })
+      }
+    }));
+
     vi.mock("../models/User.js", () => ({
       default: {
         findById: vi.fn().mockImplementation((id) => ({
@@ -46,15 +63,19 @@ describe("Analytics Integration", () => {
     }));
   });
 
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = "fallback_secret";
+  }
+
   const ownerToken = jwt.sign(
     { id: "owner123", role: "owner" },
-    process.env.JWT_SECRET || "fallback_secret",
+    process.env.JWT_SECRET,
     { expiresIn: "1h" }
   );
 
   const userToken = jwt.sign(
     { id: "user123", role: "user" },
-    process.env.JWT_SECRET || "fallback_secret",
+    process.env.JWT_SECRET,
     { expiresIn: "1h" }
   );
 
@@ -75,6 +96,9 @@ describe("Analytics Integration", () => {
       .get("/api/analytics/dashboard")
       .set("Authorization", `Bearer ${ownerToken}`);
     
+    if (res.status !== 200) {
+      console.log("analytics res.body", res.body);
+    }
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("overview");
     expect(res.body.overview.totalVenues).toBe(2);
