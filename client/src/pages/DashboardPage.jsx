@@ -2,17 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useAuth } from "../contexts/AuthContext";
+import { searchNearbyVenues } from "../services/geoapify";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "";
-const CATEGORY_MAP = {
-  restaurants: "13065",
-  nightlife: "13003",
-  shopping: "17000",
-  coffee: "13032",
-  services: "17100",
-  outdoors: "16000",
-};
 
 const CATEGORIES = [
   { id: "restaurants", label: "Restaurants", icon: "🍽️" },
@@ -63,13 +55,18 @@ function StarRow({ value, size = "sm" }) {
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
-  const [search, setSearch] = useState("");
-  const [location, setLocation] = useState("");
+  /** What the user types (restaurant / food search) */
+  const [queryInput, setQueryInput] = useState("");
+  /** When set (after Search), venue requests are restaurants-only + this name filter. When empty, requests use coords + category pill only (no text filter). */
+  const [activeQuery, setActiveQuery] = useState("");
+  /** Where to search — city, neighborhood, address, ZIP */
+  const [locationInput, setLocationInput] = useState("");
   const [activeCategory, setActiveCategory] = useState("restaurants");
   const [coords, setCoords] = useState(null);
   const [venues, setVenues] = useState([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -86,6 +83,18 @@ export function DashboardPage() {
     [user?.name]
   );
 
+  const reverseGeocode = async (lat, lng, signal) => {
+    if (!MAPBOX_TOKEN) return "";
+    const geocodeUrl = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`);
+    geocodeUrl.searchParams.set("access_token", MAPBOX_TOKEN);
+    geocodeUrl.searchParams.set("types", "place,locality,region,address");
+    geocodeUrl.searchParams.set("limit", "1");
+    const response = await fetch(geocodeUrl, { signal });
+    if (!response.ok) return "";
+    const data = await response.json();
+    return data.features?.[0]?.place_name || "";
+  };
+
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");
@@ -93,12 +102,19 @@ export function DashboardPage() {
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCoords({
+      async (position) => {
+        const next = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
-        });
+        };
+        setCoords(next);
         setError("");
+        try {
+          const place = await reverseGeocode(next.lat, next.lng);
+          if (place) setLocationInput(place);
+        } catch {
+          /* ignore */
+        }
         setLocating(false);
       },
       (geoError) => {
@@ -109,32 +125,65 @@ export function DashboardPage() {
     );
   };
 
+  /** Forward-geocode typed location, then search restaurants near that point. */
+  const handleSearchRestaurants = async () => {
+    setError("");
+    const nextQuery = queryInput.trim();
+    const shouldOverrideWithName = nextQuery.length > 0;
+
+    if (!coords && !locationInput.trim()) {
+      setError("Enter a location or use “Use my location”.");
+      return;
+    }
+    if (!shouldOverrideWithName && locationInput.trim() && !MAPBOX_TOKEN) {
+      setError("Add VITE_MAPBOX_ACCESS_TOKEN to geocode a typed location.");
+      return;
+    }
+
+    setSearching(true);
+    try {
+      let nextCoords = coords;
+
+      // Name search has priority and overrides location text search.
+      if (!shouldOverrideWithName && locationInput.trim()) {
+        const url = new URL(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationInput.trim())}.json`
+        );
+        url.searchParams.set("access_token", MAPBOX_TOKEN);
+        url.searchParams.set("limit", "1");
+        const response = await fetch(url);
+        const data = await response.json();
+        const feat = data.features?.[0];
+        if (!feat?.center) {
+          setError("Could not find that location. Try a city, ZIP, or full address.");
+          return;
+        }
+        const [lng, lat] = feat.center;
+        nextCoords = { lat, lng };
+        setCoords(nextCoords);
+        setLocationInput(feat.place_name || locationInput.trim());
+      }
+
+      if (!nextCoords) {
+        setError("No map position yet. Use your location or enter a place.");
+        return;
+      }
+
+      // Always force restaurant-only behavior when a name is submitted.
+      if (shouldOverrideWithName) {
+        setActiveCategory("restaurants");
+      }
+      setActiveQuery(nextQuery);
+    } catch (err) {
+      setError(err?.message || "Search failed.");
+    } finally {
+      setSearching(false);
+    }
+  };
+
   useEffect(() => {
     fetchCurrentLocation();
   }, []);
-
-  useEffect(() => {
-    if (!coords || !MAPBOX_TOKEN) return;
-    const controller = new AbortController();
-    const loadPlaceName = async () => {
-      try {
-        const geocodeUrl = new URL(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json`
-        );
-        geocodeUrl.searchParams.set("access_token", MAPBOX_TOKEN);
-        geocodeUrl.searchParams.set("types", "place,locality,region");
-        geocodeUrl.searchParams.set("limit", "1");
-        const response = await fetch(geocodeUrl, { signal: controller.signal });
-        if (!response.ok) return;
-        const data = await response.json();
-        setLocation(data.features?.[0]?.place_name || "");
-      } catch {
-        // ignore reverse geocode errors
-      }
-    };
-    loadPlaceName();
-    return () => controller.abort();
-  }, [coords]);
 
   useEffect(() => {
     if (!coords) return;
@@ -142,18 +191,20 @@ export function DashboardPage() {
     const loadVenues = async () => {
       setVenuesLoading(true);
       setError("");
+      const trimmedQuery = activeQuery.trim();
+      const categoryForRequest = trimmedQuery ? "restaurants" : activeCategory;
+      const queryForRequest = trimmedQuery;
       try {
-        const url = new URL(`${API_URL}/api/venues`);
-        url.searchParams.set("lat", String(coords.lat));
-        url.searchParams.set("lng", String(coords.lng));
-        url.searchParams.set("radius", "4000");
-        url.searchParams.set("limit", "20");
-        url.searchParams.set("categoryId", CATEGORY_MAP[activeCategory] || "13065");
-        if (search.trim()) url.searchParams.set("query", search.trim());
-        const response = await fetch(url, { signal: controller.signal });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data?.message || "Failed to load nearby venues.");
-        setVenues(Array.isArray(data) ? data : []);
+        const data = await searchNearbyVenues({
+          lat: coords.lat,
+          lng: coords.lng,
+          radius: 4000,
+          limit: 20,
+          category: categoryForRequest,
+          query: queryForRequest,
+          signal: controller.signal,
+        });
+        setVenues(data);
       } catch (err) {
         if (err.name !== "AbortError") {
           setError(err.message || "Failed to load venues.");
@@ -165,7 +216,7 @@ export function DashboardPage() {
     };
     loadVenues();
     return () => controller.abort();
-  }, [coords, activeCategory, search]);
+  }, [coords, activeCategory, activeQuery]);
 
   useEffect(() => {
     if (!coords || !MAPBOX_TOKEN || !mapContainerRef.current || mapRef.current) return;
@@ -237,9 +288,12 @@ export function DashboardPage() {
               </span>
               <input
                 type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="tacos, cheap dinner, date night…"
+                value={queryInput}
+                onChange={(e) => setQueryInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearchRestaurants();
+                }}
+                placeholder="Pizza, sushi, brunch…"
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
@@ -257,16 +311,28 @@ export function DashboardPage() {
               </span>
               <input
                 type="text"
-                value={location}
-                readOnly
-                placeholder="Detecting location..."
+                value={locationInput}
+                onChange={(e) => setLocationInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearchRestaurants();
+                }}
+                placeholder="City, neighborhood, or ZIP"
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
             <button
               type="button"
+              onClick={handleSearchRestaurants}
+              disabled={searching || locating}
+              className="shrink-0 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
+            >
+              {searching ? "Searching..." : "Search"}
+            </button>
+            <button
+              type="button"
               onClick={fetchCurrentLocation}
-              className="shrink-0 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40"
+              disabled={locating || searching}
+              className="shrink-0 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-60"
             >
               {locating ? "Locating..." : "Use my location"}
             </button>
@@ -332,9 +398,11 @@ export function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">The best {CATEGORIES.find((c) => c.id === activeCategory)?.label.toLowerCase() || "places"} near you</h1>
             <p className="mt-1 text-sm text-slate-600">
-              {location
-                ? `Showing places around ${location}`
-                : "Use your exact location to load nearby venues."}
+              {locationInput
+                ? `Search area: ${locationInput}`
+                : coords
+                  ? "Adjust location or search terms, then click Search."
+                  : "Enter a location or use your device location."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -446,7 +514,7 @@ export function DashboardPage() {
             {/* Recent activity */}
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
               <h3 className="text-base font-bold text-slate-900">Recent reviews</h3>
-              <p className="mt-1 text-sm text-slate-600">Activity from people near {location}</p>
+              <p className="mt-1 text-sm text-slate-600">Activity from people near {locationInput || "your area"}</p>
               <ul className="mt-4 divide-y divide-slate-100">
                 {MOCK_REVIEWS.map((r) => (
                   <li key={r.id} className="py-4 first:pt-0">
@@ -476,7 +544,9 @@ export function DashboardPage() {
                 </div>
               )}
               <div className="border-t border-slate-100 p-3">
-                <p className="text-center text-xs text-slate-500">Showing results near {location}</p>
+                <p className="text-center text-xs text-slate-500">
+                  Showing results near {locationInput || (coords ? `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}` : "—")}
+                </p>
               </div>
             </div>
           </aside>
