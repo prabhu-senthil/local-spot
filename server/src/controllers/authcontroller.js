@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import Role from "../models/roles.js";
 
 function generateToken(user) {
   return jwt.sign(
@@ -12,7 +13,7 @@ function generateToken(user) {
 
 export async function register(req, res, _next) {
   console.log("Registering user with data:", req.body);
-  const { name, email, password } = req.body;
+  const { name, email, password, role } = req.body;
 
   try {
     if (!name || !email || !password) {
@@ -26,11 +27,14 @@ export async function register(req, res, _next) {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    const validRoles = ["user", "reviewer", "admin", "owner"];
+    const assignedRole = validRoles.includes(role) ? role : "user";
+
     const user = await User.create({
       name: String(name).trim(),
       email: emailLower,
       passwordHash,
-      role: "user",
+      role: assignedRole,
       reviewsCount: 0,
     });
 
@@ -79,4 +83,29 @@ export async function login(req, res, _next) {
 export async function me(req, res) {
   return res.status(200).json(req.user);
 }
+
+export async function init(req, res) {
+  try {
+    const roleDoc = await Role.findOne();
+    if (!roleDoc || !roleDoc.roles) {
+      return res.status(200).json({ roles: ["user", "reviewer", "admin", "owner"] });
+    }
+    let rawRoles = roleDoc.roles;
+    // Inject 'Reviewer' if missing from database
+    if (!rawRoles.some(r => r.toLowerCase() === 'reviewer')) {
+      rawRoles.push('Reviewer');
+    }
+
+    const mappedRoles = rawRoles.map(r => {
+      const lower = r.toLowerCase();
+      if (lower === "restaurant-owner" || lower === "restaurant_owner") return "owner";
+      return lower.replace("-", "_");
+    });
+    return res.status(200).json({ roles: mappedRoles, displayRoles: rawRoles });
+  } catch (error) {
+    console.error("Error fetching roles:", error);
+    return res.status(500).json({ message: "Server error fetching roles" });
+  }
+}
+
 

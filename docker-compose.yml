@@ -24,6 +24,7 @@ services:
       MONGO_URL: mongodb://mongodb:27017/localspot
       JWT_SECRET: your_jwt_secret_here
       CLIENT_URL: http://localhost:3000
+      TRUST_SERVICE_URL: http://trust-service:5001
     ports:
       - "5000:5000"
 
@@ -38,6 +39,14 @@ services:
       - backend
     ports:
       - "3000:80"
+
+  trust-service:
+    build:
+      context: ./trust-service
+    container_name: localspot-trust-service
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
 
 volumes:
   mongodb_data:

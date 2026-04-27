@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useAuth } from "../contexts/AuthContext";
@@ -61,6 +62,9 @@ export function DashboardPage() {
   const [activeQuery, setActiveQuery] = useState("");
   /** Where to search — city, neighborhood, address, ZIP */
   const [locationInput, setLocationInput] = useState("");
+  const navigate = useNavigate();
+  const [search, setSearch] = useState("");
+  const [location, setLocation] = useState("");
   const [activeCategory, setActiveCategory] = useState("restaurants");
   const [coords, setCoords] = useState(null);
   const [venues, setVenues] = useState([]);
@@ -362,6 +366,22 @@ export function DashboardPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
                 {initials}
               </div>
+              {user?.role === "admin" && (
+                <Link
+                  to="/owner/dashboard"
+                  className="rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                >
+                  Global Dashboard
+                </Link>
+              )}
+              {user?.role === "owner" && (
+                <Link
+                  to="/owner/dashboard"
+                  className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 hover:bg-orange-100"
+                >
+                  My Dashboard
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={logout}
@@ -461,7 +481,7 @@ export function DashboardPage() {
                               className="text-lg font-bold text-slate-900 hover:text-blue-600 cursor-pointer"
                               onClick={() => {
                                 if (v._id) {
-                                  window.location.href = `/venue/${v._id}`;
+                                  navigate(`/venue/${v._id}`);
                                 } else {
                                   alert("Details not available for this venue yet");
                                 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -26,7 +26,26 @@ export function AuthPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "user",
   });
+
+  const [availableRoles, setAvailableRoles] = useState([]);
+  const [displayRoles, setDisplayRoles] = useState([]);
+
+  useEffect(() => {
+    if (mode === "register") {
+      fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/auth/register/init`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.roles) {
+            setAvailableRoles(data.roles);
+            setDisplayRoles(data.displayRoles || data.roles);
+            setForm(prev => ({ ...prev, role: data.roles[0] || "user" }));
+          }
+        })
+        .catch(err => console.error("Failed to fetch roles:", err));
+    }
+  }, [mode]);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -50,17 +69,23 @@ export function AuthPage() {
 
     setSubmitting(true);
     try {
+      let userData;
       if (mode === "login") {
-        await login({ email: form.email, password: form.password });
+        userData = await login({ email: form.email, password: form.password });
       } else {
-        await register({
+        userData = await register({
           name: form.name,
           email: form.email,
           password: form.password,
+          role: form.role,
         });
       }
 
-      navigate("/dashboard", { replace: true });
+      if (userData.role === 'owner' || userData.role === 'admin') {
+        navigate("/owner/dashboard", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
     } catch (err) {
       setLocalError(err.message || "Authentication failed.");
     } finally {
@@ -179,6 +204,27 @@ export function AuthPage() {
                   onChange={onChange}
                   className="input-field"
                 />
+              </div>
+            )}
+
+            {mode === "register" && availableRoles.length > 0 && (
+              <div>
+                <label htmlFor="role" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Role
+                </label>
+                <select
+                  id="role"
+                  name="role"
+                  value={form.role}
+                  onChange={onChange}
+                  className="input-field"
+                >
+                  {availableRoles.map((roleValue, index) => (
+                    <option key={roleValue} value={roleValue}>
+                      {displayRoles[index] || roleValue}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

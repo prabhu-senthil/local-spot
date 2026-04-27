@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema(
       enum: ["user", "reviewer", "admin", "owner"],
       default: "user",
     },
+    reviewerTrustScore: { type: Number, default: 0 },
     reviewsCount: { type: Number, default: 0 },
   },
   { timestamps: true }
