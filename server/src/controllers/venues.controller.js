@@ -4,7 +4,16 @@ import Review from "../models/Review.js";
 import CrowdReport from "../models/CrowdReport.js";
 
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v2/places";
-
+ 
+/** Dashboard category ids → Geoapify Places categories (comma-separated). */
+const CATEGORY_TO_GEOAPIFY = {
+  restaurants: "catering.restaurant,catering.fast_food",
+  nightlife: "catering.bar,entertainment.nightclub",
+  shopping: "commercial.shopping_mall,commercial.department_store",
+  services: "service.beauty,service.hairdresser,service.car_repair",
+  coffee: "catering.cafe",
+  outdoors: "leisure.park",
+};  
 
 function getGeoapifyApiKey() {
   const key = process.env.GEOAPIFY_API_KEY;
@@ -24,6 +33,33 @@ function toFloat(value, fallback) {
 function toInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function sanitizeNameQuery(raw) {
+  if (typeof raw !== "string") return "";
+  return raw.trim().slice(0, 200);
+}
+
+function resolveCategories(req) {
+  const slug =
+    typeof req.query.category === "string" && req.query.category.trim()
+      ? req.query.category.trim()
+      : null;
+  if (slug && CATEGORY_TO_GEOAPIFY[slug]) return CATEGORY_TO_GEOAPIFY[slug];
+
+  /** Legacy: Foursquare-style category ids from an older client. */
+  const fsq = typeof req.query.categoryId === "string" ? req.query.categoryId.trim() : "";
+  const fsqMap = {
+    "13065": CATEGORY_TO_GEOAPIFY.restaurants,
+    "13003": CATEGORY_TO_GEOAPIFY.nightlife,
+    "17000": CATEGORY_TO_GEOAPIFY.shopping,
+    "17100": CATEGORY_TO_GEOAPIFY.services,
+    "13032": CATEGORY_TO_GEOAPIFY.coffee,
+    "16000": CATEGORY_TO_GEOAPIFY.outdoors,
+  };
+  if (fsq && fsqMap[fsq]) return fsqMap[fsq];
+
+  return CATEGORY_TO_GEOAPIFY.restaurants;
 }
 
 // Map Geoapify response → your app format
@@ -62,13 +98,21 @@ export async function getVenues(req, res, next) {
     const radius = Math.min(Math.max(toInt(req.query.radius, 2000), 500), 50000);
     const limit = Math.min(Math.max(toInt(req.query.limit, 20), 1), 50);
 
+    const nameParam = sanitizeNameQuery(req.query.name);
+    const queryParam = sanitizeNameQuery(req.query.query);
+    const nameFilter = nameParam || queryParam;
+
     const url = new URL(GEOAPIFY_BASE_URL);
 
-    //circle filter (lng,lat,radius)
+    // circle filter (lon, lat, radiusMeters)
     url.searchParams.set("filter", `circle:${lng},${lat},${radius}`);
-    url.searchParams.set("categories", "catering.restaurant");
+    url.searchParams.set("categories", resolveCategories(req));
+    url.searchParams.set("bias", `proximity:${lng},${lat}`);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("apiKey", apiKey);
+
+    // Geoapify: optional "name" narrows to places matching the name (e.g. pizza, Starbucks).
+    if (nameFilter) url.searchParams.set("name", nameFilter);
 
     const response = await fetch(url);
 
