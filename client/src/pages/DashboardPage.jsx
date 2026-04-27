@@ -204,7 +204,8 @@ export function DashboardPage() {
           query: queryForRequest,
           signal: controller.signal,
         });
-        setVenues(data);
+         const filteredVenues = data.filter(v => v.name !== "Unknown");
+        setVenues(filteredVenues); 
       } catch (err) {
         if (err.name !== "AbortError") {
           setError(err.message || "Failed to load venues.");
