@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { AuthPage } from "./pages/AuthPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import VenueDetails from "./components/VenueDetails";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -60,9 +61,11 @@ export default function App() {
           />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/venue/:id" element={<VenueDetails />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+
   );
 }
 

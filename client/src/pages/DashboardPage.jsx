@@ -380,11 +380,10 @@ export function DashboardPage() {
                 key={c.id}
                 type="button"
                 onClick={() => setActiveCategory(c.id)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                  activeCategory === c.id
-                    ? "bg-slate-900 text-white shadow"
-                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                }`}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${activeCategory === c.id
+                  ? "bg-slate-900 text-white shadow"
+                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                  }`}
               >
                 <span aria-hidden>{c.icon}</span>
                 {c.label}
@@ -456,7 +455,19 @@ export function DashboardPage() {
                       <div className="flex flex-1 flex-col p-4">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
-                            <h2 className="text-lg font-bold text-slate-900 hover:text-brand cursor-pointer">{v.name}</h2>
+                            {/* <h2 className="text-lg font-bold text-slate-900 hover:text-brand cursor-pointer">{v.name}</h2> */}
+                            <h2
+                              className="text-lg font-bold text-slate-900 hover:text-blue-600 cursor-pointer"
+                              onClick={() => {
+                                if (v._id) {
+                                  window.location.href = `/venue/${v._id}`;
+                                } else {
+                                  alert("Details not available for this venue yet");
+                                }
+                              }}
+                            >
+                              {v.name}
+                            </h2>
                             <p className="text-sm text-slate-600">{v.category}</p>
                             {v.address && <p className="mt-1 text-xs text-slate-500">{v.address}</p>}
                           </div>
@@ -486,7 +497,7 @@ export function DashboardPage() {
                             className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
                             onClick={() => {
                               if (mapRef.current && typeof v.longitude === "number" && typeof v.latitude === "number") {
-                                mapRef.current.flyTo({ center: [v.longitude, v.latitude], zoom: 15 });
+                                mapRef.current.flyTo({ center: [v.longitude, v.latitude], zoom: 20 });
                               }
                             }}
                           >

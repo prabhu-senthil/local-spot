@@ -9,6 +9,7 @@
     "project-preview": "vite preview"
   },
   "dependencies": {
+    "axios": "^1.15.0",
     "mapbox-gl": "^3.9.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -21,7 +22,6 @@
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
-    "vite": "^5.4.8"
+    "vite": "^8.0.8"
   }
 }
-

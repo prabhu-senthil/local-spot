@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "seed": "node src/seed/seedVenues.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
