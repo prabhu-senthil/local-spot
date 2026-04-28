@@ -1,4 +1,7 @@
-// trust-service/src/calculate.js
+/**
+ * Core logic for calculating a venue's trust score locally.
+ * This was moved from the trust-service microservice to simplify the architecture.
+ */
 
 export function calculateTrustScore(reviews) {
   if (!reviews || reviews.length === 0) {
@@ -10,7 +13,7 @@ export function calculateTrustScore(reviews) {
   const ratings = [];
 
   // Define how much influence helpfulVotes has
-  const maxHelpfulVotes = Math.max(...reviews.map(r => r.helpfulVotes || 0), 1);
+  const maxHelpfulVotes = Math.max(...reviews.map(r => r.helpfulVotesCount || 0), 1);
 
   reviews.forEach(review => {
     const rating = review.rating || 3;
@@ -25,7 +28,7 @@ export function calculateTrustScore(reviews) {
     }
 
     // 3. ML Score Penalty: mlScore is 0 (real) to 1 (fake)
-    // We subtract the mlScore from the weight, but ensure it doesn't go below 0.1
+    // We subtract the mlScore from the weight, but ensure it doesn't go below 0.05
     const mlPenalty = (review.mlScore || 0) * 0.8; // Max 0.8 penalty
     weight = Math.max(0.05, weight - mlPenalty);
 
@@ -51,7 +54,6 @@ export function calculateTrustScore(reviews) {
   let finalScore = (weightedAverage / 5) * 100;
 
   // Anomaly Detection: Standard deviation check
-  // If std dev is very high, reviews are highly polarized.
   const mean = ratings.reduce((a, b) => a + b, 0) / ratings.length;
   const variance = ratings.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / ratings.length;
   const stdDev = Math.sqrt(variance);
@@ -59,11 +61,9 @@ export function calculateTrustScore(reviews) {
   let anomaliesDetected = false;
   let message = "Score calculated successfully.";
 
-  // Threshold for anomaly: stdDev > 1.5 implies very scattered ratings (e.g., lots of 1s and 5s)
   if (stdDev > 1.5 && ratings.length > 3) {
     anomaliesDetected = true;
     message = "High polarization detected. Score adjusted for anomalies.";
-    // Slight penalty or damping effect for highly polarized venues
     finalScore = finalScore * 0.9;
   }
 
@@ -76,17 +76,3 @@ export function calculateTrustScore(reviews) {
     message
   };
 }
-
-export const calculateHandler = (req, res) => {
-  const { reviews } = req.body;
-
-  if (!Array.isArray(reviews)) {
-    return res.status(400).json({
-      error: "Invalid payload. 'reviews' must be an array."
-    });
-  }
-
-  const result = calculateTrustScore(reviews);
-  
-  return res.status(200).json(result);
-};

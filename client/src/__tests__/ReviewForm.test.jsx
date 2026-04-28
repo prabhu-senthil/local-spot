@@ -14,13 +14,13 @@ describe("ReviewForm", () => {
   });
 
   it("should render correctly", () => {
-    render(<ReviewForm venueId="123" token="abc" />);
+    render(<ReviewForm venueId="123" />);
     expect(screen.getByText("Leave a Review")).toBeDefined();
     expect(screen.getByText("Submit Review")).toBeDefined();
   });
 
   it("should show an error if submitted without a rating", async () => {
-    render(<ReviewForm venueId="123" token="abc" />);
+    render(<ReviewForm venueId="123" />);
     const submitButton = screen.getByText("Submit Review");
     fireEvent.click(submitButton);
 
@@ -34,7 +34,7 @@ describe("ReviewForm", () => {
     const mockOnSubmit = vi.fn();
     reviewApi.submitReview.mockResolvedValue({ _id: "rev1", rating: 5 });
 
-    render(<ReviewForm venueId="123" token="abc" onReviewSubmitted={mockOnSubmit} />);
+    render(<ReviewForm venueId="123" onReviewSubmitted={mockOnSubmit} />);
     
     // Select a rating (the 5th star)
     const stars = screen.getAllByRole("button").filter(b => b.querySelector("svg"));
@@ -55,7 +55,7 @@ describe("ReviewForm", () => {
         reviewText: "Amazing experience!",
         crowdLevel: "moderate", // default
         images: []
-      }, "abc");
+      });
       expect(mockOnSubmit).toHaveBeenCalledWith({ _id: "rev1", rating: 5 });
     });
   });

@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import apiClient from "../services/apiClient";
 
 const AuthContext = createContext(undefined);
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const STORAGE_KEY = "localspot_auth";
 
 export function AuthProvider({ children }) {
@@ -37,22 +37,14 @@ export function AuthProvider({ children }) {
 
       setLoading(true);
       try {
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!response.ok) {
-          throw new Error("Session expired. Please sign in again.");
-        }
-
-        const data = await response.json();
-        setUser(data);
+        const response = await apiClient.get("/auth/me");
+        setUser(response.data);
         setError("");
       } catch (err) {
+        // Interceptor handles 401 refresh, so if we're here, refresh likely failed
         setUser(null);
         setToken(null);
-        localStorage.removeItem(STORAGE_KEY);
-        setError(err.message || "Failed to fetch current user.");
+        setError(err.response?.data?.message || "Failed to fetch current user.");
       } finally {
         setLoading(false);
       }
@@ -62,48 +54,50 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   const register = async ({ name, email, password, role }) => {
-    const response = await fetch(`${API_URL}/api/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, role }),
-    });
+    try {
+      const response = await apiClient.post("/auth/register", { name, email, password, role });
+      const data = response.data;
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || "Registration failed");
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: data.token }));
+      setToken(data.token);
+      setUser({ id: data.id, name: data.name, email: data.email, role: data.role });
+      setError("");
+      return data;
+    } catch (err) {
+      const msg = err.response?.data?.message || "Registration failed";
+      setError(msg);
+      throw new Error(msg);
     }
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: data.token }));
-    setToken(data.token);
-    setUser({ id: data.id, name: data.name, email: data.email, role: data.role });
-    setError("");
-    return data;
   };
 
   const login = async ({ email, password }) => {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const response = await apiClient.post("/auth/login", { email, password });
+      const data = response.data;
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || "Login failed");
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: data.token }));
+      setToken(data.token);
+      setUser({ id: data.id, name: data.name, email: data.email, role: data.role });
+      setError("");
+      return data;
+    } catch (err) {
+      const msg = err.response?.data?.message || "Login failed";
+      setError(msg);
+      throw new Error(msg);
     }
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: data.token }));
-    setToken(data.token);
-    setUser({ id: data.id, name: data.name, email: data.email, role: data.role });
-    setError("");
-    return data;
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem(STORAGE_KEY);
-    setError("");
+  const logout = async () => {
+    try {
+      await apiClient.post("/auth/logout");
+    } catch (err) {
+      console.error("Logout failed on server:", err);
+    } finally {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem(STORAGE_KEY);
+      setError("");
+    }
   };
 
   const value = useMemo(

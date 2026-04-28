@@ -1,12 +1,6 @@
-import axios from "axios";
+import apiClient from "./apiClient";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-export const submitCrowdReport = async (venueId, status, token) => {
-  const res = await axios.post(`${API_URL}/api/crowd`, { venueId, status }, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
+export const submitCrowdReport = async (venueId, status) => {
+  const res = await apiClient.post("/crowd", { venueId, status });
   return res.data;
 };

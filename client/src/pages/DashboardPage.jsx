@@ -3,8 +3,9 @@ import { useNavigate, Link } from "react-router-dom";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useAuth } from "../contexts/AuthContext";
+import apiClient from "../services/apiClient";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "";
 const CATEGORY_MAP = {
   restaurants: "13065",
@@ -145,16 +146,18 @@ export function DashboardPage() {
       setVenuesLoading(true);
       setError("");
       try {
-        const url = new URL(`${API_URL}/api/venues`);
-        url.searchParams.set("lat", String(coords.lat));
-        url.searchParams.set("lng", String(coords.lng));
-        url.searchParams.set("radius", "4000");
-        url.searchParams.set("limit", "20");
-        url.searchParams.set("categoryId", CATEGORY_MAP[activeCategory] || "13065");
-        if (search.trim()) url.searchParams.set("query", search.trim());
-        const response = await fetch(url, { signal: controller.signal });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data?.message || "Failed to load nearby venues.");
+        const response = await apiClient.get("/venues", {
+          params: {
+            lat: coords.lat,
+            lng: coords.lng,
+            radius: 4000,
+            limit: 20,
+            categoryId: CATEGORY_MAP[activeCategory] || "13065",
+            query: search.trim() || undefined
+          },
+          signal: controller.signal
+        });
+        const data = response.data;
         setVenues(Array.isArray(data) ? data : []);
       } catch (err) {
         if (err.name !== "AbortError") {

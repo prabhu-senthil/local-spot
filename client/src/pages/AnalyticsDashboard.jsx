@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import { Store, Star, MessageSquare, Camera } from "lucide-react";
 import PhotoUpload from "../components/PhotoUpload";
-import axios from "axios";
+import apiClient from "../services/apiClient";
 
 export default function AnalyticsDashboard() {
   const { token, user, logout } = useAuth();
@@ -29,12 +29,12 @@ export default function AnalyticsDashboard() {
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
-    getOwnerDashboard(token)
+    if (!user) return;
+    getOwnerDashboard()
       .then(setData)
       .catch((err) => setError(err.response?.data?.message || "Failed to load dashboard"))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [user]);
 
   if (!user || (user.role !== "owner" && user.role !== "admin")) {
     return (
@@ -317,15 +317,13 @@ export default function AnalyticsDashboard() {
                 Upload a high-quality image to represent {data.restaurantInfo.name}. This will be shown on your venue details page.
               </p>
               <PhotoUpload 
-                token={token} 
                 maxPhotos={1}
                 onUploadComplete={async (urls) => {
                   if (urls.length > 0) {
                     try {
-                      await axios.put(
-                        `${import.meta.env.VITE_API_URL}/api/venues/${data.allVenues[0]._id}/image`,
-                        { imageUrl: urls[0] },
-                        { headers: { Authorization: `Bearer ${token}` } }
+                      await apiClient.put(
+                        `/venues/${data.allVenues[0]._id}/image`,
+                        { imageUrl: urls[0] }
                       );
                       // Update local state to reflect new image immediately
                       setData(prev => ({

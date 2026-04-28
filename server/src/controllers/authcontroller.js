@@ -3,13 +3,28 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Role from "../models/roles.js";
 
-function generateToken(user) {
+function generateAccessToken(user) {
   return jwt.sign(
     { id: user._id.toString(), role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: "30d" }
+    { expiresIn: "15m" }
   );
 }
+
+function generateRefreshToken(user) {
+  return jwt.sign(
+    { id: user._id.toString() },
+    process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+}
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
 
 export async function register(req, res, _next) {
   console.log("Registering user with data:", req.body);
@@ -38,13 +53,17 @@ export async function register(req, res, _next) {
       reviewsCount: 0,
     });
 
-    const token = generateToken(user);
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    res.cookie("refreshToken", refreshToken, cookieOptions);
+
     return res.status(201).json({
       id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-      token,
+      token: accessToken,
     });
   } catch (err) {
     return res.status(500).json({ message: "Server error" });
@@ -67,13 +86,17 @@ export async function login(req, res, _next) {
     const ok = await user.matchPassword(password);
     if (!ok) return res.status(401).json({ message: "Invalid email or password." });
 
-    const token = generateToken(user);
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    res.cookie("refreshToken", refreshToken, cookieOptions);
+
     return res.status(200).json({
       id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-      token,
+      token: accessToken,
     });
   } catch (err) {
     return res.status(500).json({ message: "Server error" });
@@ -106,6 +129,29 @@ export async function init(req, res) {
     console.error("Error fetching roles:", error);
     return res.status(500).json({ message: "Server error fetching roles" });
   }
+}
+
+export async function refresh(req, res) {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken) {
+    return res.status(401).json({ message: "No refresh token" });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(401).json({ message: "User not found" });
+
+    const newAccessToken = generateAccessToken(user);
+    return res.json({ token: newAccessToken });
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid refresh token" });
+  }
+}
+
+export async function logout(req, res) {
+  res.clearCookie("refreshToken", cookieOptions);
+  return res.status(200).json({ message: "Logged out successfully" });
 }
 
 

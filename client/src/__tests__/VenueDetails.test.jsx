@@ -138,7 +138,7 @@ describe("VenueDetails", () => {
     });
 
     await waitFor(() => {
-      expect(claimVenue).toHaveBeenCalledWith("venue1", "valid-token");
+      expect(claimVenue).toHaveBeenCalledWith("venue1");
     });
   });
 
@@ -169,7 +169,7 @@ describe("VenueDetails", () => {
     });
 
     await waitFor(() => {
-      expect(voteOnReview).toHaveBeenCalledWith("r1", "upvote", "valid-token");
+      expect(voteOnReview).toHaveBeenCalledWith("r1", "upvote");
     });
   });
 

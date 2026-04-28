@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema(
     },
     reviewerTrustScore: { type: Number, default: 0 },
     reviewsCount: { type: Number, default: 0 },
+    otpHash: { type: String },
+    otpExpires: { type: Date },
   },
   { timestamps: true }
 );

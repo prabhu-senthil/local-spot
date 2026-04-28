@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import Venue from "../models/Venue.js";
 import Review from "../models/Review.js";
 import CrowdReport from "../models/CrowdReport.js";
+import User from "../models/User.js";
+import { generateOTP, hashOTP, verifyOTP, sendOTPEmail } from "../services/otpService.js";
 
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v2/places";
 
@@ -200,6 +202,7 @@ export const getVenueById = async (req, res, next) => {
 };
 
 export const claimVenue = async (req, res, next) => {
+  console.log(`Received claim request for venue ${req.params.id} from user ${req.user.id}`);
   try {
     const venue = await Venue.findById(req.params.id);
     if (!venue) {
@@ -209,19 +212,85 @@ export const claimVenue = async (req, res, next) => {
       return res.status(403).json({ message: "This venue has already been claimed." });
     }
     
+    // Only Owners need OTP
+    if (req.user.role !== "owner") {
+      return res.status(403).json({ message: "Only users with the Owner role can claim restaurants." });
+    }
+
     // Check if the user already owns a venue
     const existingVenue = await Venue.findOne({ ownerId: req.user.id });
     if (existingVenue) {
-      console.warn(`[Claim Venue Warning] User ${req.user.id} attempted to claim multiple venues.`);
       return res.status(403).json({ message: "You can only claim one restaurant." });
     }
+
+    // Generate and send OTP
+    const otp = generateOTP();
+    const otpHash = await hashOTP(otp);
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    await User.findByIdAndUpdate(req.user.id, {
+      otpHash,
+      otpExpires,
+    });
+
+    await sendOTPEmail(req.user.email, otp);
     
-    venue.ownerId = req.user.id;
+    // Force devOTP in response to ensure visibility for the user
+    res.status(200).json({ 
+      message: "OTP sent to your email. Please verify to complete the claim.",
+      devOTP: otp 
+    });
+  } catch (err) {
+    console.error(`[Claim Venue Request Error] ${err.message}`, err);
+    next(err);
+  }
+};
+
+export const verifyClaimOTP = async (req, res, next) => {
+  try {
+    const { otp } = req.body;
+    const venueId = req.params.id;
+
+    if (!otp) {
+      return res.status(400).json({ message: "OTP is required." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user || !user.otpHash || !user.otpExpires) {
+      return res.status(400).json({ message: "No active OTP request found." });
+    }
+
+    // Check expiry
+    if (user.otpExpires < new Date()) {
+      return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+    }
+
+    // Verify OTP
+    const isValid = await verifyOTP(otp, user.otpHash);
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid OTP." });
+    }
+
+    const venue = await Venue.findById(venueId);
+    if (!venue) {
+      return res.status(404).json({ message: "Venue not found." });
+    }
+    if (venue.ownerId) {
+      return res.status(403).json({ message: "This venue has already been claimed." });
+    }
+
+    // Grant ownership
+    venue.ownerId = user._id;
     await venue.save();
-    
+
+    // Clear OTP data
+    user.otpHash = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
     res.status(200).json({ message: "Venue claimed successfully", venue });
   } catch (err) {
-    console.error(`[Claim Venue Error] Failed to claim venue: ${err.message}`, err);
+    console.error(`[Verify OTP Error] ${err.message}`, err);
     next(err);
   }
 };

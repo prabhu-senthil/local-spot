@@ -59,6 +59,24 @@ const reviewSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    
+    // ML and Trust features
+    mlScore: {
+      type: Number,
+      default: 0,
+    },
+    isSuspicious: {
+      type: Boolean,
+      default: false,
+    },
+    helpfulVotes: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
+    suspiciousVotes: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
   },
   { timestamps: true }
 );

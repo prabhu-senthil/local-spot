@@ -3,7 +3,7 @@ import { Star } from "lucide-react";
 import { submitReview } from "../services/reviewApi";
 import PhotoUpload from "./PhotoUpload";
 
-export default function ReviewForm({ venueId, token, onReviewSubmitted }) {
+export default function ReviewForm({ venueId, onReviewSubmitted }) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
@@ -29,7 +29,7 @@ export default function ReviewForm({ venueId, token, onReviewSubmitted }) {
         reviewText,
         crowdLevel,
         images
-      }, token);
+      });
       
       setRating(0);
       setReviewText("");
@@ -117,7 +117,6 @@ export default function ReviewForm({ venueId, token, onReviewSubmitted }) {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Add Photos (Optional)</label>
           <PhotoUpload 
-            token={token} 
             onUploadComplete={(urls) => setImages(urls)} 
             maxPhotos={3} 
             currentPhotos={images}

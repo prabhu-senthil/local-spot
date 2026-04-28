@@ -13,7 +13,7 @@ describe("CrowdReportToggle", () => {
   });
 
   it("should render Quiet and Busy buttons", () => {
-    render(<CrowdReportToggle venueId="123" token="abc" />);
+    render(<CrowdReportToggle venueId="123" />);
     expect(screen.getByText("Quiet")).toBeDefined();
     expect(screen.getByText("Busy")).toBeDefined();
   });
@@ -22,13 +22,13 @@ describe("CrowdReportToggle", () => {
     const mockOnSubmit = vi.fn();
     crowdApi.submitCrowdReport.mockResolvedValue({ _id: "cr1", status: "busy" });
 
-    render(<CrowdReportToggle venueId="123" token="abc" onReportSubmitted={mockOnSubmit} />);
+    render(<CrowdReportToggle venueId="123" onReportSubmitted={mockOnSubmit} />);
     
     const busyButton = screen.getByText("Busy");
     fireEvent.click(busyButton);
 
     await waitFor(() => {
-      expect(crowdApi.submitCrowdReport).toHaveBeenCalledWith("123", "busy", "abc");
+      expect(crowdApi.submitCrowdReport).toHaveBeenCalledWith("123", "busy");
       expect(mockOnSubmit).toHaveBeenCalledWith("busy");
     });
   });

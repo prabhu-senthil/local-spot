@@ -1,21 +1,11 @@
-import axios from "axios";
+import apiClient from "./apiClient";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-export const submitReview = async (reviewData, token) => {
-  const res = await axios.post(`${API_URL}/api/reviews`, reviewData, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
+export const submitReview = async (reviewData) => {
+  const res = await apiClient.post("/reviews", reviewData);
   return res.data;
 };
 
-export const voteOnReview = async (reviewId, voteType, token) => {
-  const res = await axios.post(`${API_URL}/api/reviews/${reviewId}/vote`, { voteType }, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
+export const voteOnReview = async (reviewId, voteType) => {
+  const res = await apiClient.post(`/reviews/${reviewId}/vote`, { voteType });
   return res.data;
 };

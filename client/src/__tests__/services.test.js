@@ -4,8 +4,9 @@ import * as venueApi from "../services/venueApi";
 import * as reviewApi from "../services/reviewApi";
 import * as crowdApi from "../services/crowdApi";
 import * as analyticsApi from "../services/analyticsApi";
+import apiClient from "../services/apiClient";
 
-vi.mock("axios");
+vi.mock("../services/apiClient");
 
 describe("Client API Services", () => {
   beforeEach(() => {
@@ -15,88 +16,69 @@ describe("Client API Services", () => {
   describe("venueApi", () => {
     it("getVenueDetails should fetch a specific venue", async () => {
       const mockData = { _id: "1", name: "Venue 1" };
-      axios.get.mockResolvedValue({ data: mockData });
+      apiClient.get.mockResolvedValue({ data: mockData });
       
       const result = await venueApi.getVenueDetails("1");
       
-      expect(axios.get).toHaveBeenCalledWith(expect.stringContaining("/api/venues/1"));
+      expect(apiClient.get).toHaveBeenCalledWith("/venues/1");
       expect(result).toEqual(mockData);
     });
 
-    it("claimVenue should call post with token", async () => {
+    it("claimVenue should call post without explicit token", async () => {
       const mockData = { _id: "1", ownerId: "user1" };
-      axios.post.mockResolvedValue({ data: mockData });
+      apiClient.post.mockResolvedValue({ data: mockData });
       
-      const result = await venueApi.claimVenue("1", "token123");
+      const result = await venueApi.claimVenue("1");
       
-      expect(axios.post).toHaveBeenCalledWith(
-        expect.stringContaining("/api/venues/1/claim"),
-        {},
-        { headers: { Authorization: "Bearer token123" } }
-      );
+      expect(apiClient.post).toHaveBeenCalledWith("/venues/1/claim");
       expect(result).toEqual(mockData);
     });
   });
 
   describe("reviewApi", () => {
 
-    it("submitReview should post review data with token", async () => {
+    it("submitReview should post review data", async () => {
       const mockData = { _id: "r1", rating: 5 };
-      axios.post.mockResolvedValue({ data: mockData });
+      apiClient.post.mockResolvedValue({ data: mockData });
       
       const reviewData = { venueId: "1", rating: 5, reviewText: "Great" };
-      const result = await reviewApi.submitReview(reviewData, "token123");
+      const result = await reviewApi.submitReview(reviewData);
       
-      expect(axios.post).toHaveBeenCalledWith(
-        expect.stringContaining("/api/reviews"),
-        reviewData,
-        { headers: { Authorization: "Bearer token123" } }
-      );
+      expect(apiClient.post).toHaveBeenCalledWith("/reviews", reviewData);
       expect(result).toEqual(mockData);
     });
 
-    it("voteOnReview should post vote data with token", async () => {
+    it("voteOnReview should post vote data", async () => {
       const mockData = { _id: "r1", upvotes: ["u1"] };
-      axios.post.mockResolvedValue({ data: mockData });
+      apiClient.post.mockResolvedValue({ data: mockData });
       
-      const result = await reviewApi.voteOnReview("r1", "upvote", "token123");
+      const result = await reviewApi.voteOnReview("r1", "upvote");
       
-      expect(axios.post).toHaveBeenCalledWith(
-        expect.stringContaining("/api/reviews/r1/vote"),
-        { voteType: "upvote" },
-        { headers: { Authorization: "Bearer token123" } }
-      );
+      expect(apiClient.post).toHaveBeenCalledWith("/reviews/r1/vote", { voteType: "upvote" });
       expect(result).toEqual(mockData);
     });
   });
 
   describe("crowdApi", () => {
-    it("submitCrowdReport should post status with token", async () => {
+    it("submitCrowdReport should post status", async () => {
       const mockData = { _id: "cr1", status: "busy" };
-      axios.post.mockResolvedValue({ data: mockData });
+      apiClient.post.mockResolvedValue({ data: mockData });
       
-      const result = await crowdApi.submitCrowdReport("1", "busy", "token123");
+      const result = await crowdApi.submitCrowdReport("1", "busy");
       
-      expect(axios.post).toHaveBeenCalledWith(
-        expect.stringContaining("/api/crowd"),
-        { venueId: "1", status: "busy" },
-        { headers: { Authorization: "Bearer token123" } }
-      );
+      expect(apiClient.post).toHaveBeenCalledWith("/crowd", { venueId: "1", status: "busy" });
       expect(result).toEqual(mockData);
     });
   });
 
   describe("analyticsApi", () => {
-    it("getOwnerDashboard should fetch dashboard with token", async () => {
+    it("getOwnerDashboard should fetch dashboard", async () => {
       const mockData = { overview: { totalVenues: 1 } };
-      axios.get.mockResolvedValue({ data: mockData });
+      apiClient.get.mockResolvedValue({ data: mockData });
       
-      const result = await analyticsApi.getOwnerDashboard("token123");
+      const result = await analyticsApi.getOwnerDashboard();
       
-      expect(axios.get).toHaveBeenCalledWith(
-        expect.stringContaining("/api/analytics/dashboard"),
-        { headers: { Authorization: "Bearer token123" } }
-      );
+      expect(apiClient.get).toHaveBeenCalledWith("/analytics/dashboard");
       expect(result).toEqual(mockData);
     });
   });

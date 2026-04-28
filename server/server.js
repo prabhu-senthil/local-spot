@@ -1,6 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import cookieParser from "cookie-parser";
+import morgan from "morgan";
 import { connectDB } from "./src/config/db.js";
 
 import healthRoutes from "./src/routes/health.routes.js";
@@ -22,9 +24,12 @@ const app = express();
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
   })
 );
 app.use(express.json());
+app.use(cookieParser());
+app.use(morgan("dev"));
 
 app.use("/api", healthRoutes);
 // app.post('/api/auth/register', (req, res) => {

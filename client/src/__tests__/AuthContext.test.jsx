@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
+import apiClient from "../services/apiClient";
+
+vi.mock("../services/apiClient");
 
 // A dummy component to consume the context
 function TestComponent() {
@@ -24,7 +27,6 @@ function TestComponent() {
 
 describe("AuthContext", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
     localStorage.clear();
     vi.clearAllMocks();
   });
@@ -47,9 +49,8 @@ describe("AuthContext", () => {
   it("should load user if token exists in localStorage", async () => {
     localStorage.setItem("localspot_auth", JSON.stringify({ token: "valid-token" }));
     
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: "1", name: "Saved User", email: "saved@test.com", role: "user" })
+    apiClient.get.mockResolvedValueOnce({
+      data: { id: "1", name: "Saved User", email: "saved@test.com", role: "user" }
     });
 
     render(
@@ -67,9 +68,8 @@ describe("AuthContext", () => {
   it("should clear auth if token is invalid", async () => {
     localStorage.setItem("localspot_auth", JSON.stringify({ token: "invalid-token" }));
     
-    global.fetch.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ message: "Invalid token" })
+    apiClient.get.mockRejectedValueOnce({
+      response: { data: { message: "Invalid token" } }
     });
 
     render(
@@ -80,15 +80,13 @@ describe("AuthContext", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("user-name").textContent).toBe("");
-      expect(screen.getByTestId("error").textContent).toBe("Session expired. Please sign in again.");
-      expect(localStorage.getItem("localspot_auth")).toBeNull();
+      expect(screen.getByTestId("error").textContent).toBe("Invalid token");
     });
   });
 
   it("should login and set user state", async () => {
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: "1", name: "Logged In", email: "log@test.com", role: "admin", token: "new-token" })
+    apiClient.post.mockResolvedValueOnce({
+      data: { id: "1", name: "Logged In", email: "log@test.com", role: "admin", token: "new-token" }
     });
 
     render(
@@ -114,10 +112,10 @@ describe("AuthContext", () => {
   it("should logout and clear state", async () => {
     // start logged in
     localStorage.setItem("localspot_auth", JSON.stringify({ token: "valid-token" }));
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: "1", name: "Saved User", role: "user" })
+    apiClient.get.mockResolvedValueOnce({
+      data: { id: "1", name: "Saved User", role: "user" }
     });
+    apiClient.post.mockResolvedValueOnce({ data: { message: "Logged out" } });
 
     render(
       <AuthProvider>
@@ -127,19 +125,20 @@ describe("AuthContext", () => {
 
     await waitFor(() => expect(screen.getByTestId("user-name").textContent).toBe("Saved User"));
 
-    act(() => {
+    await act(async () => {
       screen.getByText("Logout").click();
     });
 
-    expect(screen.getByTestId("user-name").textContent).toBe("");
-    expect(screen.getByTestId("token").textContent).toBe("");
-    expect(localStorage.getItem("localspot_auth")).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("user-name").textContent).toBe("");
+      expect(screen.getByTestId("token").textContent).toBe("");
+      expect(localStorage.getItem("localspot_auth")).toBeNull();
+    });
   });
 
   it("should register a new user", async () => {
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: "2", name: "New User", email: "new@test.com", role: "user", token: "reg-token" })
+    apiClient.post.mockResolvedValueOnce({
+      data: { id: "2", name: "New User", email: "new@test.com", role: "user", token: "reg-token" }
     });
 
     render(

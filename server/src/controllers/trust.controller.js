@@ -1,45 +1,27 @@
-import axios from "axios";
 import Review from "../models/Review.js";
 import TrustScore from "../models/TrustScore.js";
-
-const TRUST_SERVICE_URL = process.env.TRUST_SERVICE_URL || "http://localhost:5001";
+import { calculateTrustScore } from "../utils/trustCalculator.js";
 
 export const calculateTrust = async (venueId) => {
   try {
-    const reviews = await Review.find({ venueId }).lean();
+    const rawReviews = await Review.find({ venueId }).populate("userId", "role").lean();
+    
+    // Map reviews to include counts and user role for logic
+    const reviews = rawReviews.map(r => ({
+      ...r,
+      userRole: r.userId?.role || "user",
+      helpfulVotesCount: r.helpfulVotes?.length || 0,
+      suspiciousVotesCount: r.suspiciousVotes?.length || 0,
+    }));
 
     let trustScoreValue = 0;
     
     if (reviews.length > 0) {
-      try {
-        // Attempt to call the microservice with up to 2 retries
-        let response;
-        let attempts = 0;
-        const maxRetries = 2;
-        
-        while (attempts <= maxRetries) {
-          try {
-            response = await axios.post(`${TRUST_SERVICE_URL}/calculate`, {
-              reviews
-            }, { timeout: 5000 });
-            break; // Success
-          } catch (err) {
-            attempts++;
-            if (attempts > maxRetries) throw err;
-            await new Promise(res => setTimeout(res, 1000 * attempts)); // exponential backoff
-          }
-        }
-        
-        trustScoreValue = response.data.score;
-        if (response.data.anomaliesDetected) {
-          console.warn(`[TrustService] Anomalies detected for venue ${venueId}: ${response.data.message}`);
-        }
-      } catch (microserviceErr) {
-        console.error(`[TrustService] Failed to reach trust-service, falling back to local calculation:`, microserviceErr.message);
-        
-        // Fallback logic
-        const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
-        trustScoreValue = avgRating * 20; 
+      const result = calculateTrustScore(reviews);
+      trustScoreValue = result.score;
+      
+      if (result.anomaliesDetected) {
+        console.warn(`[TrustLocal] Anomalies detected for venue ${venueId}: ${result.message}`);
       }
     }
 

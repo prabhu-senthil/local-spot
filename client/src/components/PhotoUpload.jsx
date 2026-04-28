@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Camera, X, Loader2, ImagePlus } from 'lucide-react';
 import axios from 'axios';
+import apiClient from '../services/apiClient';
 
-export default function PhotoUpload({ token, onUploadComplete, maxPhotos = 1, currentPhotos = [] }) {
+export default function PhotoUpload({ onUploadComplete, maxPhotos = 1, currentPhotos = [] }) {
   const [photos, setPhotos] = useState(currentPhotos);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -41,9 +42,7 @@ export default function PhotoUpload({ token, onUploadComplete, maxPhotos = 1, cu
 
     try {
       // 1. Get signature from our backend
-      const sigRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/upload/signature`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const sigRes = await apiClient.get("/upload/signature");
       
       const { signature, timestamp, cloudName, apiKey } = sigRes.data;
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { submitCrowdReport } from "../services/crowdApi";
 
-export default function CrowdReportToggle({ venueId, token, onReportSubmitted }) {
+export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -10,7 +10,7 @@ export default function CrowdReportToggle({ venueId, token, onReportSubmitted })
     setError("");
 
     try {
-      await submitCrowdReport(venueId, status, token);
+      await submitCrowdReport(venueId, status);
       if (onReportSubmitted) {
         onReportSubmitted(status);
       }

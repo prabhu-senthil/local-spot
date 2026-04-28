@@ -1,17 +1,16 @@
-import axios from "axios";
+import apiClient from "./apiClient";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-export const getVenueDetails = async(id)=>{
-
-  const res = await axios.get(`${API_URL}/api/venues/${id}`);
-
+export const getVenueDetails = async (id) => {
+  const res = await apiClient.get(`/venues/${id}`);
   return res.data;
 };
 
-export const claimVenue = async (id, token) => {
-  const res = await axios.post(`${API_URL}/api/venues/${id}/claim`, {}, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export const claimVenue = async (id) => {
+  const res = await apiClient.post(`/venues/${id}/claim`);
+  return res.data;
+};
+
+export const verifyClaimOTP = async (id, otp) => {
+  const res = await apiClient.post(`/venues/${id}/claim/verify`, { otp });
   return res.data;
 };

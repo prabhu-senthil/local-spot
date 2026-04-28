@@ -4,6 +4,9 @@ import "@testing-library/jest-dom";
 import { BrowserRouter } from "react-router-dom";
 import { DashboardPage } from "../pages/DashboardPage";
 import { useAuth } from "../contexts/AuthContext";
+import apiClient from "../services/apiClient";
+
+vi.mock("../services/apiClient");
 
 // Mock the Auth context
 vi.mock("../contexts/AuthContext", () => ({
@@ -83,11 +86,9 @@ describe("DashboardPage", () => {
       if (url.toString().includes("mapbox.com")) {
         return { ok: true, json: async () => ({ features: [{ place_name: "New York" }] }) };
       }
-      if (url.toString().includes("/api/venues")) {
-        return { ok: true, json: async () => [] };
-      }
       return { ok: true, json: async () => [] };
     });
+    apiClient.get.mockResolvedValue({ data: [] });
 
     renderDashboard();
 
@@ -99,27 +100,24 @@ describe("DashboardPage", () => {
 
   it("should fetch and display venues based on geolocation", async () => {
     global.fetch.mockImplementation(async (url) => {
-      console.log("FETCH:", url.toString());
       if (url.toString().includes("mapbox.com")) {
         return { ok: true, json: async () => ({ features: [{ place_name: "New York" }] }) };
       }
-      if (url.toString().includes("/api/venues")) {
-        return {
-          ok: true,
-          json: async () => ([
-            {
-              _id: "venue1",
-              name: "Test Restaurant",
-              category: "Restaurants",
-              latitude: 40.7128,
-              longitude: -74.006,
-              rating: 4.5,
-              distanceText: "1.2 km"
-            }
-          ])
-        };
-      }
       return { ok: true, json: async () => [] };
+    });
+
+    apiClient.get.mockResolvedValue({
+      data: [
+        {
+          _id: "venue1",
+          name: "Test Restaurant",
+          category: "Restaurants",
+          latitude: 40.7128,
+          longitude: -74.006,
+          rating: 4.5,
+          distanceText: "1.2 km"
+        }
+      ]
     });
 
     renderDashboard();

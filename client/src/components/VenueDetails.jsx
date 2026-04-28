@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getVenueDetails } from "../services/venueApi";
 import { 
   ArrowLeft, MapPin, Star, Clock, AlertCircle, 
   Users, Activity, ShieldCheck, CheckCircle2,
@@ -9,7 +8,7 @@ import {
 import ReviewForm from "./ReviewForm";
 import CrowdReportToggle from "./CrowdReportToggle";
 import { useAuth } from "../contexts/AuthContext";
-import { claimVenue } from "../services/venueApi";
+import { getVenueDetails, claimVenue, verifyClaimOTP } from "../services/venueApi";
 import { voteOnReview } from "../services/reviewApi";
 
 export default function VenueDetails() {
@@ -21,17 +20,70 @@ export default function VenueDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [claiming, setClaiming] = useState(false);
+  const [showOTP, setShowOTP] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const handleClaimRequest = async () => {
+    console.log(">>> CLAIM BUTTON CLICKED for venue:", id);
+    if (!token) {
+      console.warn(">>> No token found in AuthContext");
+      alert("Please log in again.");
+      return;
+    }
+    try {
+      setClaiming(true);
+      console.log(">>> Sending claim request...");
+      const res = await claimVenue(id);
+      console.log(">>> Claim request response SUCCESS:", res);
+      if (res.devOTP) {
+        console.log("*************************************************");
+        console.log(">>> [DEV MODE] OTP RECEIVED:", res.devOTP);
+        console.log("*************************************************");
+      }
+      alert(res.message);
+      setShowOTP(true);
+    } catch (err) {
+      console.error(">>> Claim request response ERROR:", err);
+      console.error(">>> Error data:", err.response?.data);
+      alert(err.response?.data?.message || "Failed to request claim OTP");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    console.log(">>> VERIFY OTP BUTTON CLICKED with OTP:", otp);
+    try {
+      setVerifying(true);
+      const res = await verifyClaimOTP(id, otp);
+      console.log(">>> Verify OTP response SUCCESS:", res);
+      setVenue((prev) => ({ ...prev, ownerId: res.venue.ownerId }));
+      setShowOTP(false);
+      alert("Venue claimed successfully!");
+    } catch (err) {
+      console.error(">>> Verify OTP response ERROR:", err);
+      alert(err.response?.data?.message || "Invalid OTP");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const handleVote = async (reviewId, voteType) => {
-    if (!token) return;
+    console.log(">>> VOTE ATTEMPT:", { reviewId, voteType, userId: user?.id || user?._id });
+    if (!user) {
+      console.warn(">>> No user logged in, cannot vote.");
+      return;
+    }
     try {
-      const updatedReview = await voteOnReview(reviewId, voteType, token);
+      const updatedReview = await voteOnReview(reviewId, voteType);
+      console.log(">>> VOTE SUCCESS, updated review:", updatedReview);
       setVenue((prev) => ({
         ...prev,
-        reviews: prev.reviews.map(r => r._id === reviewId ? updatedReview : r)
+        reviews: prev.reviews.map(r => String(r._id) === String(reviewId) ? updatedReview : r)
       }));
     } catch (err) {
-      console.error("Failed to vote:", err);
+      console.error(">>> VOTE FAILED:", err);
     }
   };
 
@@ -166,24 +218,41 @@ export default function VenueDetails() {
 
         {user?.role === "owner" && !venue.ownerId && (
           <div className="mt-6">
-            <button 
-              onClick={async () => {
-                try {
-                  setClaiming(true);
-                  const res = await claimVenue(id, token);
-                  setVenue((prev) => ({ ...prev, ownerId: res.venue.ownerId }));
-                } catch (err) {
-                  alert(err.response?.data?.message || "Failed to claim venue");
-                } finally {
-                  setClaiming(false);
-                }
-              }}
-              disabled={claiming}
-              className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-bold text-white transition hover:bg-green-700 disabled:opacity-50"
-            >
-              <CheckCircle2 className="h-5 w-5" />
-              {claiming ? "Claiming..." : "Claim this Venue as Owner"}
-            </button>
+            {!showOTP ? (
+              <button 
+                onClick={handleClaimRequest}
+                disabled={claiming}
+                className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-bold text-white transition hover:bg-green-700 disabled:opacity-50"
+              >
+                <CheckCircle2 className="h-5 w-5" />
+                {claiming ? "Requesting OTP..." : "Claim this Venue as Owner"}
+              </button>
+            ) : (
+              <div className="flex flex-col gap-3 max-w-sm p-4 bg-white rounded-xl shadow-sm border border-green-100">
+                <p className="text-sm font-medium text-slate-700">Enter the 6-digit OTP sent to your email:</p>
+                <input 
+                  type="text" 
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="000000"
+                  className="input-field text-center text-xl tracking-widest font-mono"
+                />
+                <button 
+                  onClick={handleVerifyOTP}
+                  disabled={verifying || otp.length !== 6}
+                  className="btn-primary w-full"
+                >
+                  {verifying ? "Verifying..." : "Verify & Claim"}
+                </button>
+                <button 
+                  onClick={() => setShowOTP(false)}
+                  className="text-xs text-slate-500 hover:text-slate-700 text-center"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -232,6 +301,14 @@ export default function VenueDetails() {
                           <p className="text-xs text-slate-400 mt-0.5">Verified Visit</p>
                         </div>
                       </div>
+                      {/* New: Suspicious Badge */}
+                      {r.isSuspicious && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 mb-3 w-fit">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Potentially Fake</span>
+                        </div>
+                      )}
+
                       <p className="text-slate-600 text-sm leading-relaxed mb-3">{r.reviewText || "No comment provided."}</p>
                       
                       {r.images && r.images.length > 0 && (
@@ -247,31 +324,33 @@ export default function VenueDetails() {
                         </div>
                       )}
 
-                      {/* Upvote / Downvote */}
-                      <div className="flex items-center gap-4 mt-2">
+                      {/* Upvote / Downvote / Helpful / Suspicious */}
+                      <div className="flex items-center gap-3 mt-2">
                         <button 
-                          onClick={() => handleVote(r._id, 'upvote')}
-                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition ${
-                            user && r.upvotes?.includes(user.id) 
-                              ? 'bg-blue-50 text-blue-600' 
-                              : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                          onClick={() => handleVote(r._id, 'helpful')}
+                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition border ${
+                            user && (r.helpfulVotes?.includes(user.id) || r.helpfulVotes?.includes(user._id))
+                              ? 'bg-green-50 text-green-600 border-green-200' 
+                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                           }`}
                           disabled={!user}
                         >
-                          <ThumbsUp className="w-4 h-4" />
-                          <span>{r.upvotes?.length || 0}</span>
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                          <span>Helpful ({r.helpfulVotes?.length || 0})</span>
                         </button>
+                        
                         <button 
-                          onClick={() => handleVote(r._id, 'downvote')}
-                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition ${
-                            user && r.downvotes?.includes(user.id) 
-                              ? 'bg-red-50 text-red-600' 
-                              : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                          onClick={() => handleVote(r._id, 'suspicious')}
+                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition border ${
+                            user && (r.suspiciousVotes?.includes(user.id) || r.suspiciousVotes?.includes(user._id))
+                              ? 'bg-red-50 text-red-600 border-red-200' 
+                              : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
                           }`}
+                          title="Report as potentially suspicious"
                           disabled={!user}
                         >
-                          <ThumbsDown className="w-4 h-4" />
-                          <span>{r.downvotes?.length || 0}</span>
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          <span>Suspicious ({r.suspiciousVotes?.length || 0})</span>
                         </button>
                       </div>
                     </div>
@@ -292,7 +371,6 @@ export default function VenueDetails() {
                 ) : (
                   <ReviewForm 
                     venueId={venue._id} 
-                    token={token} 
                     onReviewSubmitted={(newReview) => {
                       setVenue(prev => ({
                         ...prev,
@@ -386,7 +464,6 @@ export default function VenueDetails() {
               {user ? (
                 <CrowdReportToggle 
                   venueId={venue._id} 
-                  token={token} 
                   onReportSubmitted={(status) => {
                     setVenue((prev) => ({
                       ...prev,
