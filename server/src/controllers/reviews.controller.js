@@ -92,23 +92,15 @@ export async function voteOnReview(req, res) {
     const review = await Review.findById(id);
     if (!review) return res.status(404).json({ message: "Review not found" });
 
-    // Initialize arrays if they don't exist
-    if (!review.upvotes) review.upvotes = [];
-    if (!review.downvotes) review.downvotes = [];
+    // Initialize arrays if they don't exist 
     if (!review.helpfulVotes) review.helpfulVotes = [];
     if (!review.suspiciousVotes) review.suspiciousVotes = [];
 
-    // Remove user from all arrays first
-    review.upvotes.pull(userId);
-    review.downvotes.pull(userId);
+    // Remove user from all arrays first 
     review.helpfulVotes.pull(userId);
     review.suspiciousVotes.pull(userId);
 
-    if (voteType === 'upvote') {
-      review.upvotes.push(userId);
-    } else if (voteType === 'downvote') {
-      review.downvotes.push(userId);
-    } else if (voteType === 'helpful') {
+     if (voteType === 'helpful') {
       review.helpfulVotes.push(userId);
     } else if (voteType === 'suspicious') {
       review.suspiciousVotes.push(userId);
@@ -120,7 +112,7 @@ export async function voteOnReview(req, res) {
     const User = (await import("../models/User.js")).default;
     const reviewAuthor = await User.findById(review.userId);
     
-    if (reviewAuthor && reviewAuthor.role === 'reviewer') {
+    if (reviewAuthor && (reviewAuthor.role === 'reviewer' || reviewAuthor.role === 'user')) {
       // Find all reviews by this reviewer
       const authorReviews = await Review.find({ userId: reviewAuthor._id });
       let trustScore = 0;
