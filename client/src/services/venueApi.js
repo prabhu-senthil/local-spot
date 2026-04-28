@@ -10,6 +10,11 @@ export const claimVenue = async (id) => {
   return res.data;
 };
 
+export const resendClaimOTP = async (id) => {
+  const res = await apiClient.post(`/venues/${id}/claim/resend`);
+  return res.data;
+};
+
 export const verifyClaimOTP = async (id, otp) => {
   const res = await apiClient.post(`/venues/${id}/claim/verify`, { otp });
   return res.data;

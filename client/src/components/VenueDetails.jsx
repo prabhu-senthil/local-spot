@@ -8,7 +8,12 @@ import {
 import ReviewForm from "./ReviewForm";
 import CrowdReportToggle from "./CrowdReportToggle";
 import { useAuth } from "../contexts/AuthContext";
-import { getVenueDetails, claimVenue, verifyClaimOTP } from "../services/venueApi";
+import {
+  getVenueDetails,
+  claimVenue,
+  resendClaimOTP,
+  verifyClaimOTP,
+} from "../services/venueApi";
 import { voteOnReview } from "../services/reviewApi";
 
 export default function VenueDetails() {
@@ -23,46 +28,65 @@ export default function VenueDetails() {
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [resendingOtp, setResendingOtp] = useState(false);
+  const [otpExpiresIn, setOtpExpiresIn] = useState(0);
+  const [resendAvailableIn, setResendAvailableIn] = useState(0);
+  const [claimMessage, setClaimMessage] = useState("");
+
+  const formatSeconds = (value) => {
+    const safe = Math.max(0, Number(value) || 0);
+    const mins = Math.floor(safe / 60);
+    const secs = safe % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const handleClaimRequest = async () => {
-    console.log(">>> CLAIM BUTTON CLICKED for venue:", id);
     if (!token) {
-      console.warn(">>> No token found in AuthContext");
       alert("Please log in again.");
       return;
     }
     try {
       setClaiming(true);
-      console.log(">>> Sending claim request...");
       const res = await claimVenue(id);
-      console.log(">>> Claim request response SUCCESS:", res);
-      if (res.devOTP) {
-        console.log("*************************************************");
-        console.log(">>> [DEV MODE] OTP RECEIVED:", res.devOTP);
-        console.log("*************************************************");
-      }
-      alert(res.message);
+      setClaimMessage(res.message || "OTP sent. Please verify to complete claim.");
+      setOtpExpiresIn(res.otpExpiresInSeconds ?? 120);
+      setResendAvailableIn(res.resendAvailableInSeconds ?? 30);
       setShowOTP(true);
+      setOtp("");
     } catch (err) {
-      console.error(">>> Claim request response ERROR:", err);
-      console.error(">>> Error data:", err.response?.data);
       alert(err.response?.data?.message || "Failed to request claim OTP");
     } finally {
       setClaiming(false);
     }
   };
 
+  const handleResendOTP = async () => {
+    try {
+      setResendingOtp(true);
+      const res = await resendClaimOTP(id);
+      setClaimMessage(res.message || "A new OTP has been sent.");
+      setOtpExpiresIn(res.otpExpiresInSeconds ?? 120);
+      setResendAvailableIn(res.resendAvailableInSeconds ?? 30);
+      setOtp("");
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to resend OTP");
+    } finally {
+      setResendingOtp(false);
+    }
+  };
+
   const handleVerifyOTP = async () => {
-    console.log(">>> VERIFY OTP BUTTON CLICKED with OTP:", otp);
     try {
       setVerifying(true);
-      const res = await verifyClaimOTP(id, otp);
-      console.log(">>> Verify OTP response SUCCESS:", res);
+      const res = await verifyClaimOTP(id, otp.trim());
       setVenue((prev) => ({ ...prev, ownerId: res.venue.ownerId }));
       setShowOTP(false);
+      setOtp("");
+      setOtpExpiresIn(0);
+      setResendAvailableIn(0);
+      setClaimMessage("");
       alert("Venue claimed successfully!");
     } catch (err) {
-      console.error(">>> Verify OTP response ERROR:", err);
       alert(err.response?.data?.message || "Invalid OTP");
     } finally {
       setVerifying(false);
@@ -99,6 +123,17 @@ export default function VenueDetails() {
     };
     fetchVenue();
   }, [id]);
+
+  useEffect(() => {
+    if (!showOTP) return undefined;
+
+    const timer = setInterval(() => {
+      setOtpExpiresIn((prev) => (prev > 0 ? prev - 1 : 0));
+      setResendAvailableIn((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [showOTP]);
 
   if (loading) {
     return (
@@ -229,7 +264,16 @@ export default function VenueDetails() {
               </button>
             ) : (
               <div className="flex flex-col gap-3 max-w-sm p-4 bg-white rounded-xl shadow-sm border border-green-100">
+                {claimMessage && (
+                  <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                    {claimMessage}
+                  </p>
+                )}
                 <p className="text-sm font-medium text-slate-700">Enter the 6-digit OTP sent to your email:</p>
+                <div className="text-xs text-slate-600">
+                  <p>OTP expires in: <span className="font-semibold">{formatSeconds(otpExpiresIn)}</span></p>
+                  <p>Resend available in: <span className="font-semibold">{formatSeconds(resendAvailableIn)}</span></p>
+                </div>
                 <input 
                   type="text" 
                   maxLength={6}
@@ -240,13 +284,28 @@ export default function VenueDetails() {
                 />
                 <button 
                   onClick={handleVerifyOTP}
-                  disabled={verifying || otp.length !== 6}
+                  disabled={verifying || otp.trim().length !== 6 || otpExpiresIn <= 0}
                   className="btn-primary w-full"
                 >
                   {verifying ? "Verifying..." : "Verify & Claim"}
                 </button>
+                <button
+                  onClick={handleResendOTP}
+                  disabled={resendingOtp || resendAvailableIn > 0}
+                  className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {resendingOtp
+                    ? "Resending..."
+                    : resendAvailableIn > 0
+                      ? `Resend OTP in ${formatSeconds(resendAvailableIn)}`
+                      : "Resend OTP"}
+                </button>
                 <button 
-                  onClick={() => setShowOTP(false)}
+                  onClick={() => {
+                    setShowOTP(false);
+                    setOtp("");
+                    setClaimMessage("");
+                  }}
                   className="text-xs text-slate-500 hover:text-slate-700 text-center"
                 >
                   Cancel

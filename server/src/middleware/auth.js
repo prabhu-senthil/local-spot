@@ -19,7 +19,8 @@ export async function protect(req, res, next) {
   }
 }
 
-export function authorizeRoles(...roles) {
+export function 
+authorizeRoles(...roles) {
   return (req, res, next) => {
     console.log(`Checking roles ${roles} for user ${req.user?.id} with role ${req.user?.role}`);
     if (!req.user || !roles.includes(req.user.role)) {

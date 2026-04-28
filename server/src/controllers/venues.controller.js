@@ -6,6 +6,8 @@ import User from "../models/User.js";
 import { generateOTP, hashOTP, verifyOTP, sendOTPEmail } from "../services/otpService.js";
 
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v2/places";
+const OTP_VALIDITY_MS = 120 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
  
 /** Dashboard category ids → Geoapify Places categories (comma-separated). */
 const CATEGORY_TO_GEOAPIFY = {
@@ -246,8 +248,9 @@ export const getVenueById = async (req, res, next) => {
 };
 
 export const claimVenue = async (req, res, next) => {
-  console.log(`Received claim request for venue ${req.params.id} from user ${req.user.id}`);
   try {
+    console.log("Claiming venue with data:", req.body);
+    const venueId = req.params.id;
     const venue = await Venue.findById(req.params.id);
     if (!venue) {
       return res.status(404).json({ message: "Venue not found" });
@@ -267,25 +270,102 @@ export const claimVenue = async (req, res, next) => {
       return res.status(403).json({ message: "You can only claim one restaurant." });
     }
 
-    // Generate and send OTP
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // If an OTP is already active for the same venue, ask frontend to wait or verify.
+    if (user.otpHash && user.otpExpires && user.otpTargetVenueId?.toString() === venueId) {
+      const now = Date.now();
+      const expiresInMs = new Date(user.otpExpires).getTime() - now;
+      const resendInMs =
+        user.otpRequestedAt
+          ? new Date(user.otpRequestedAt).getTime() + OTP_RESEND_COOLDOWN_MS - now
+          : 0;
+
+      if (expiresInMs > 0) {
+        return res.status(200).json({
+          message: "OTP already sent. Please verify or resend after cooldown.",
+          otpExpiresInSeconds: Math.ceil(expiresInMs / 1000),
+          resendAvailableInSeconds: Math.max(0, Math.ceil(resendInMs / 1000)),
+        });
+      }
+    }
+
+    // Generate and send OTP from backend
     const otp = generateOTP();
     const otpHash = await hashOTP(otp);
-    const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const now = new Date();
+    const otpExpires = new Date(now.getTime() + OTP_VALIDITY_MS); // 120 seconds
 
-    await User.findByIdAndUpdate(req.user.id, {
-      otpHash,
-      otpExpires,
-    });
-
-    await sendOTPEmail(req.user.email, otp);
-    
-    // Force devOTP in response to ensure visibility for the user
+    user.otpHash = otpHash;
+    user.otpExpires = otpExpires;
+    user.otpRequestedAt = now;
+    user.otpTargetVenueId = venue._id;
+    await user.save(); 
+    await sendOTPEmail(user.email, otp); 
     res.status(200).json({ 
       message: "OTP sent to your email. Please verify to complete the claim.",
-      devOTP: otp 
+      otpExpiresInSeconds: Math.ceil(OTP_VALIDITY_MS / 1000),
+      resendAvailableInSeconds: Math.ceil(OTP_RESEND_COOLDOWN_MS / 1000),
     });
   } catch (err) {
-    console.error(`[Claim Venue Request Error] ${err.message}`, err);
+    next(err);
+  }
+};
+
+export const resendClaimOTP = async (req, res, next) => {
+  try {
+    const venueId = req.params.id;
+    const venue = await Venue.findById(venueId);
+    if (!venue) {
+      return res.status(404).json({ message: "Venue not found." });
+    }
+    if (venue.ownerId) {
+      return res.status(403).json({ message: "This venue has already been claimed." });
+    }
+
+    const existingVenue = await Venue.findOne({ ownerId: req.user.id });
+    if (existingVenue) {
+      return res.status(403).json({ message: "You can only claim one restaurant." });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    if (user.otpTargetVenueId?.toString() !== venueId) {
+      return res.status(400).json({
+        message: "No claim OTP found for this venue. Start claim process first.",
+      });
+    }
+
+    const nowMs = Date.now();
+    const requestedAtMs = user.otpRequestedAt ? new Date(user.otpRequestedAt).getTime() : 0;
+    const resendInMs = requestedAtMs + OTP_RESEND_COOLDOWN_MS - nowMs;
+    if (resendInMs > 0) {
+      return res.status(429).json({
+        message: "Please wait before requesting another OTP.",
+        resendAvailableInSeconds: Math.ceil(resendInMs / 1000),
+      });
+    }
+
+    const otp = generateOTP();
+    user.otpHash = await hashOTP(otp);
+    user.otpExpires = new Date(nowMs + OTP_VALIDITY_MS);
+    user.otpRequestedAt = new Date(nowMs);
+    await user.save();
+
+    await sendOTPEmail(user.email, otp);
+
+    return res.status(200).json({
+      message: "A new OTP has been sent to your email.",
+      otpExpiresInSeconds: Math.ceil(OTP_VALIDITY_MS / 1000),
+      resendAvailableInSeconds: Math.ceil(OTP_RESEND_COOLDOWN_MS / 1000),
+    });
+  } catch (err) {
     next(err);
   }
 };
@@ -302,6 +382,9 @@ export const verifyClaimOTP = async (req, res, next) => {
     const user = await User.findById(req.user.id);
     if (!user || !user.otpHash || !user.otpExpires) {
       return res.status(400).json({ message: "No active OTP request found." });
+    }
+    if (user.otpTargetVenueId?.toString() !== venueId) {
+      return res.status(400).json({ message: "OTP does not match this venue claim request." });
     }
 
     // Check expiry
@@ -330,11 +413,12 @@ export const verifyClaimOTP = async (req, res, next) => {
     // Clear OTP data
     user.otpHash = undefined;
     user.otpExpires = undefined;
+    user.otpRequestedAt = undefined;
+    user.otpTargetVenueId = undefined;
     await user.save();
 
     res.status(200).json({ message: "Venue claimed successfully", venue });
   } catch (err) {
-    console.error(`[Verify OTP Error] ${err.message}`, err);
     next(err);
   }
 };

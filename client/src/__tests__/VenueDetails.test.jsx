@@ -4,7 +4,7 @@ import "@testing-library/jest-dom";
 import { BrowserRouter } from "react-router-dom";
 import VenueDetails from "../components/VenueDetails";
 import { useAuth } from "../contexts/AuthContext";
-import { getVenueDetails, claimVenue } from "../services/venueApi";
+import { getVenueDetails, claimVenue, resendClaimOTP, verifyClaimOTP } from "../services/venueApi";
 import { voteOnReview } from "../services/reviewApi";
 
 vi.mock("../contexts/AuthContext", () => ({
@@ -14,6 +14,8 @@ vi.mock("../contexts/AuthContext", () => ({
 vi.mock("../services/venueApi", () => ({
   getVenueDetails: vi.fn(),
   claimVenue: vi.fn(),
+  resendClaimOTP: vi.fn(),
+  verifyClaimOTP: vi.fn(),
 }));
 
 vi.mock("../services/reviewApi", () => ({
@@ -73,6 +75,8 @@ describe("VenueDetails", () => {
       token: "valid-token",
     });
     getVenueDetails.mockResolvedValue(mockVenue);
+    resendClaimOTP.mockResolvedValue({ message: "OTP resent", otpExpiresInSeconds: 120, resendAvailableInSeconds: 30 });
+    verifyClaimOTP.mockResolvedValue({ venue: { ownerId: "owner1" } });
   });
 
   const renderComponent = () => {

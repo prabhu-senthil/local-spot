@@ -15,6 +15,8 @@ const userSchema = new mongoose.Schema(
     reviewsCount: { type: Number, default: 0 },
     otpHash: { type: String },
     otpExpires: { type: Date },
+    otpRequestedAt: { type: Date },
+    otpTargetVenueId: { type: mongoose.Schema.Types.ObjectId, ref: "Venue" },
   },
   { timestamps: true }
 );
