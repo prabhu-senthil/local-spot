@@ -20,7 +20,7 @@ async def classify_review(data: ReviewData):
         score = classifier.predict(data.text, data.metadata)
         return {
             "mlScore": score,
-            "isSuspicious": score > 0.7,
+            "isSuspicious": score >= classifier.threshold,
             "message": "Review analyzed successfully"
         }
     except Exception as e:

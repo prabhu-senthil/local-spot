@@ -104,7 +104,17 @@ export async function login(req, res, _next) {
 }
 
 export async function me(req, res) {
-  return res.status(200).json(req.user);
+  // req.user is already populated by the protect middleware (excluding passwordHash)
+  // Return a clean shape that includes trust fields for the frontend
+  return res.status(200).json({
+    id: req.user._id,
+    name: req.user.name,
+    email: req.user.email,
+    role: req.user.role,
+    reviewerTrustScore: req.user.reviewerTrustScore ?? 0,
+    status: req.user.status ?? "active",
+    reviewsCount: req.user.reviewsCount ?? 0,
+  });
 }
 
 export async function init(req, res) {

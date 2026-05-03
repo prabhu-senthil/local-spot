@@ -4,36 +4,54 @@ import CrowdAnalytics from "../models/CrowdAnalytics.js";
 export async function createCrowdReport(req, res) {
   try {
     const { venueId, status } = req.body;
-    
-    // Create the individual report document
+    const userId = req.user.id;
+
+    // ── Guard 1: Owners cannot submit crowd reports ───────────────────────
+    if (req.user.role === "owner") {
+      return res.status(403).json({
+        message: "Venue owners are not allowed to submit crowd reports."
+      });
+    }
+
+    // ── Guard 2: 1 report per user per venue per calendar hour ────────────
+    const startOfHour = new Date();
+    startOfHour.setMinutes(0, 0, 0); // floor to HH:00:00.000
+
+    const existingThisHour = await CrowdReport.findOne({
+      userId,
+      venueId,
+      createdAt: { $gte: startOfHour }
+    });
+
+    if (existingThisHour) {
+      const nextAllowedAt = new Date(startOfHour.getTime() + 60 * 60 * 1000);
+      return res.status(429).json({
+        message: "You can only submit one crowd report per venue per hour.",
+        nextAllowedAt
+      });
+    }
+
+    // ── Create report ─────────────────────────────────────────────────────
     const newReport = await CrowdReport.create({
       venueId,
+      userId,
       status,
       createdAt: new Date()
     });
 
-    // Aggregation Logic
+    // ── Update hourly aggregation ─────────────────────────────────────────
     const now = new Date();
     const hour = now.getHours();
-    const dayOfWeek = now.getDay(); // 0 is Sunday
+    const dayOfWeek = now.getDay();
 
-    // Update CrowdAnalytics using upsert
     const updateQuery = {
-      $inc: {
-        totalReports: 1,
-      },
-      $set: {
-        lastUpdated: now,
-      }
+      $inc: { totalReports: 1 },
+      $set: { lastUpdated: now }
     };
 
-    if (status === "busy") {
-      updateQuery.$inc.busyCount = 1;
-    } else if (status === "quiet") {
-      updateQuery.$inc.quietCount = 1;
-    } else if (status === "moderate") {
-      updateQuery.$inc.moderateCount = 1;
-    }
+    if (status === "busy") updateQuery.$inc.busyCount = 1;
+    else if (status === "quiet") updateQuery.$inc.quietCount = 1;
+    else if (status === "moderate") updateQuery.$inc.moderateCount = 1;
 
     await CrowdAnalytics.findOneAndUpdate(
       { venueId, hour, dayOfWeek },

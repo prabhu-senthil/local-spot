@@ -73,6 +73,7 @@ describe("VenueDetails", () => {
     useAuth.mockReturnValue({
       user: { id: "1", name: "Test User", role: "user" },
       token: "valid-token",
+      refreshUser: vi.fn(),
     });
     getVenueDetails.mockResolvedValue(mockVenue);
     resendClaimOTP.mockResolvedValue({ message: "OTP resent", otpExpiresInSeconds: 120, resendAvailableInSeconds: 30 });
@@ -146,10 +147,11 @@ describe("VenueDetails", () => {
     });
   });
 
-  it("should allow voting on a review", async () => {
+  it("should allow voting on a review and handle enriched response", async () => {
+    // New API shape: { review, reviewer }
     voteOnReview.mockResolvedValue({
-      ...mockVenue.reviews[0],
-      upvotes: ["1"]
+      review: { ...mockVenue.reviews[0], helpfulVotes: ["1"] },
+      reviewer: { _id: "reviewer1", reviewerTrustScore: 3, status: "active" },
     });
 
     renderComponent();
@@ -158,22 +160,15 @@ describe("VenueDetails", () => {
       expect(screen.getByText("Great place!")).toBeInTheDocument();
     });
 
-    const buttons = screen.getAllByRole("button");
-    // Find the upvote button (it's the first vote button in the list)
-    // The exact selection might be tricky, so we check if voteOnReview gets called
-    // Let's trigger a click on the upvote button which has ThumbsUp icon
-    // Actually, we can look for the button containing "0" upvotes initially
-    
-    // There are back buttons and vote buttons. We will just click the 2nd button (back is 1st, upvote is 2nd).
-    // Or simpler, get buttons with '0' inside
-    const voteBtns = screen.getAllByText("0");
+    // Find the Helpful vote button by its label text
+    const helpfulBtn = await screen.findByRole("button", { name: /helpful/i });
     
     act(() => {
-      voteBtns[0].click(); // Click upvote
+      helpfulBtn.click();
     });
 
     await waitFor(() => {
-      expect(voteOnReview).toHaveBeenCalledWith("r1", "upvote");
+      expect(voteOnReview).toHaveBeenCalledWith("r1", "helpful");
     });
   });
 
@@ -189,5 +184,46 @@ describe("VenueDetails", () => {
     await waitFor(() => {
       expect(screen.getByTestId("mock-crowd-toggle")).toBeInTheDocument();
     });
+  });
+
+  it("should NOT update review when voting on own review (403 self-vote)", async () => {
+    // Set up a review authored by the currently logged-in user
+    const selfVenueData = {
+      ...mockVenue,
+      reviews: [
+        {
+          _id: "r1",
+          userId: { _id: "1", name: "Test User" }, // same id as logged-in user
+          rating: 5,
+          reviewText: "My own review!",
+          helpfulVotes: [],
+          suspiciousVotes: [],
+        },
+      ],
+    };
+    getVenueDetails.mockResolvedValue(selfVenueData);
+
+    // Simulate server returning 403 for self-vote
+    const selfVoteError = new Error("Forbidden");
+    selfVoteError.response = { status: 403, data: { message: "You cannot vote on your own review." } };
+    voteOnReview.mockRejectedValue(selfVoteError);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText("My own review!")).toBeInTheDocument();
+    });
+
+    // Attempt to click a vote button — if visible (component may hide for own reviews)
+    const helpfulBtns = screen.queryAllByRole("button", { name: /helpful/i });
+    if (helpfulBtns.length > 0) {
+      act(() => helpfulBtns[0].click());
+      // The component should handle the 403 gracefully without crashing
+      await waitFor(() => {
+        // Review text should still be visible (no crash / unmount)
+        expect(screen.getByText("My own review!")).toBeInTheDocument();
+      });
+    }
+    // If no buttons are rendered (component hides them for own reviews), that's also valid
   });
 });

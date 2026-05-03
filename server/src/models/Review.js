@@ -69,6 +69,16 @@ const reviewSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Three-tier classification from fakeReviewDetectionService
+    suspicionScore: {
+      type: Number,
+      default: 0,
+    },
+    suspicionClassification: {
+      type: String,
+      enum: ["genuine", "suspicious", "highly_suspicious"],
+      default: "genuine",
+    },
     helpfulVotes: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],

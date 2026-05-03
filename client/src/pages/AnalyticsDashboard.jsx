@@ -156,7 +156,7 @@ export default function AnalyticsDashboard() {
       ) : (
         <div className="bg-white border-b border-slate-200 py-8 shrink-0">
           <div className="max-w-7xl mx-auto px-4 md:px-8">
-            <h1 className="text-3xl font-bold text-slate-800">Global Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold text-slate-800">Owner Dashboard</h1>
             <p className="text-slate-500 mt-2">Overview of all venues across the platform.</p>
           </div>
         </div>

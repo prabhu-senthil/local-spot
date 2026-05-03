@@ -211,6 +211,7 @@ export const getVenueById = async (req, res, next) => {
 
     // Fetch associated reviews
     const reviews = await Review.find({ venueId: venue._id })
+      .populate("userId", "name reviewerTrustScore status")
       .sort({ createdAt: -1 })
       .lean();
 

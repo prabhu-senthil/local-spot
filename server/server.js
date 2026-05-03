@@ -13,6 +13,7 @@ import notificationsRoutes from "./src/routes/notifications.routes.js";
 import analyticsRoutes from "./src/routes/analytics.routes.js";
 import crowdRoutes from "./src/routes/crowd.routes.js";
 import uploadRoutes from "./src/routes/upload.routes.js";
+import adminRoutes from "./src/routes/admin.routes.js";
 
 import errorHandler from "./src/middleware/errorHandler.js";
 
@@ -42,6 +43,7 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/crowd", crowdRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use(errorHandler);
 

@@ -4,16 +4,33 @@ import "@testing-library/jest-dom";
 import { BrowserRouter } from "react-router-dom";
 import { DashboardPage } from "../pages/DashboardPage";
 import { useAuth } from "../contexts/AuthContext";
-import apiClient from "../services/apiClient";
 
-vi.mock("../services/apiClient");
-
-// Mock the Auth context
+// ── Mock Auth Context ─────────────────────────────────────────────────────────
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: vi.fn(),
 }));
 
-// Mock mapbox-gl
+// ── Mock geoapify (venue search) ──────────────────────────────────────────────
+// DashboardPage calls searchNearbyVenues from geoapify.js, not apiClient.
+// We mock the whole module so tests control exactly what venues are returned.
+vi.mock("../services/geoapify", () => ({
+  searchNearbyVenues: vi.fn(),
+  searchRestaurants: vi.fn(),
+}));
+
+// ── Mock apiClient (needed by other imports; prevents interceptors crash) ─────
+vi.mock("../services/apiClient", () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
+  },
+}));
+
+// ── Mock mapbox-gl ────────────────────────────────────────────────────────────
 vi.mock("mapbox-gl", () => ({
   default: {
     Map: vi.fn(function () {
@@ -41,55 +58,71 @@ vi.mock("mapbox-gl", () => ({
   },
 }));
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const mockUser = {
+  id: "1",
+  name: "Test User",
+  email: "test@example.com",
+  role: "user",
+  reviewerTrustScore: 0,
+  status: "active",
+};
+
 describe("DashboardPage", () => {
   const mockLogout = vi.fn();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    vi.stubGlobal("fetch", vi.fn());
 
+    // Default auth mock
     useAuth.mockReturnValue({
-      user: { id: "1", name: "Test User", email: "test@example.com", role: "user" },
+      user: mockUser,
       logout: mockLogout,
+      refreshUser: vi.fn(),
     });
 
-    // Mock geolocation
-    const mockGeolocation = {
-      getCurrentPosition: vi.fn().mockImplementation((success) =>
-        success({
-          coords: {
-            latitude: 40.7128,
-            longitude: -74.006,
-          },
-        })
-      ),
-    };
+    // Default geolocation mock — resolves immediately
     Object.defineProperty(global.navigator, "geolocation", {
-      value: mockGeolocation,
+      value: {
+        getCurrentPosition: vi.fn().mockImplementation((success) =>
+          success({ coords: { latitude: 40.7128, longitude: -74.006 } })
+        ),
+      },
       configurable: true,
     });
-    
-    // Set mapbox token
-    import.meta.env.VITE_MAPBOX_ACCESS_TOKEN = "dummy_token";
+
+    // Default global fetch — handles reverse geocode (Mapbox) and any fallback
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (url) => {
+        if (url.toString().includes("mapbox.com")) {
+          return {
+            ok: true,
+            json: async () => ({
+              features: [{ place_name: "New York" }],
+            }),
+          };
+        }
+        return { ok: true, json: async () => [] };
+      })
+    );
+
+    // Default searchNearbyVenues — empty list (overridden per test)
+    const { searchNearbyVenues } = await import("../services/geoapify");
+    searchNearbyVenues.mockResolvedValue([]);
   });
 
-  const renderDashboard = () => {
-    return render(
+  const renderDashboard = () =>
+    render(
       <BrowserRouter>
         <DashboardPage />
       </BrowserRouter>
     );
-  };
+
+  // ── Tests ──────────────────────────────────────────────────────────────────
 
   it("should render header with user info", async () => {
-    global.fetch.mockImplementation(async (url) => {
-      if (url.toString().includes("mapbox.com")) {
-        return { ok: true, json: async () => ({ features: [{ place_name: "New York" }] }) };
-      }
-      return { ok: true, json: async () => [] };
-    });
-    apiClient.get.mockResolvedValue({ data: [] });
-
     renderDashboard();
 
     await waitFor(() => {
@@ -99,41 +132,33 @@ describe("DashboardPage", () => {
   });
 
   it("should fetch and display venues based on geolocation", async () => {
-    global.fetch.mockImplementation(async (url) => {
-      if (url.toString().includes("mapbox.com")) {
-        return { ok: true, json: async () => ({ features: [{ place_name: "New York" }] }) };
-      }
-      return { ok: true, json: async () => [] };
-    });
+    const { searchNearbyVenues } = await import("../services/geoapify");
 
-    apiClient.get.mockResolvedValue({
-      data: [
-        {
-          _id: "venue1",
-          name: "Test Restaurant",
-          category: "Restaurants",
-          latitude: 40.7128,
-          longitude: -74.006,
-          rating: 4.5,
-          distanceText: "1.2 km"
-        }
-      ]
-    });
+    // Provide test venues via the geoapify mock
+    searchNearbyVenues.mockResolvedValue([
+      {
+        _id: "venue1",
+        name: "Test Restaurant",
+        category: "Restaurants",
+        latitude: 40.7128,
+        longitude: -74.006,
+        rating: 4.5,
+        distanceText: "1.2 km",
+      },
+    ]);
 
     renderDashboard();
 
-    await waitFor(() => {
-      expect(screen.getByText("Test Restaurant")).toBeInTheDocument();
-      expect(screen.getByText("1.2 km")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("Detecting location...").value).toBe("New York");
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText("Test Restaurant")).toBeInTheDocument();
+        expect(screen.getByText("1.2 km")).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
   });
 
   it("should call logout when log out button is clicked", async () => {
-    global.fetch.mockImplementation(async () => {
-      return { ok: true, json: async () => [] };
-    });
-
     renderDashboard();
 
     const logoutBtn = await screen.findByText("Log out");

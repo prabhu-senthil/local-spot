@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import apiClient from "../services/apiClient";
 
 const AuthContext = createContext(undefined);
@@ -53,6 +53,17 @@ export function AuthProvider({ children }) {
     loadUser();
   }, [token]);
 
+  /** Re-fetch the current user's profile (including trust score + status). */
+  const refreshUser = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await apiClient.get("/auth/me");
+      setUser(response.data);
+    } catch (err) {
+      console.error("Failed to refresh user:", err);
+    }
+  }, [token]);
+
   const register = async ({ name, email, password, role }) => {
     try {
       const response = await apiClient.post("/auth/register", { name, email, password, role });
@@ -101,8 +112,8 @@ export function AuthProvider({ children }) {
   };
 
   const value = useMemo(
-    () => ({ user, token, loading, error, setError, register, login, logout }),
-    [user, token, loading, error]
+    () => ({ user, token, loading, error, setError, register, login, logout, refreshUser }),
+    [user, token, loading, error, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -113,4 +124,3 @@ export function useAuth() {
   if (!context) throw new Error("useAuth must be used inside AuthProvider.");
   return context;
 }
-

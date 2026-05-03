@@ -12,6 +12,11 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
     reviewerTrustScore: { type: Number, default: 0 },
+    status: {
+      type: String,
+      enum: ["active", "blocked"],
+      default: "active",
+    },
     reviewsCount: { type: Number, default: 0 },
     otpHash: { type: String },
     otpExpires: { type: Date },

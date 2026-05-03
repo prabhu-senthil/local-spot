@@ -19,11 +19,13 @@ import { voteOnReview } from "../services/reviewApi";
 export default function VenueDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { token, user } = useAuth();
+  const { token, user, refreshUser } = useAuth();
 
   const [venue, setVenue] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Map of reviewerId → { reviewerTrustScore, status } for optimistic UI updates
+  const [reviewerTrustMap, setReviewerTrustMap] = useState({});
   const [claiming, setClaiming] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState("");
@@ -100,14 +102,41 @@ export default function VenueDetails() {
       return;
     }
     try {
-      const updatedReview = await voteOnReview(reviewId, voteType);
+      const result = await voteOnReview(reviewId, voteType);
+      // API now returns { review, reviewer } — handle both old and new shape
+      const updatedReview = result.review || result;
+      const reviewerData = result.reviewer || null;
+
       console.log(">>> VOTE SUCCESS, updated review:", updatedReview);
+
+      // Update the review in the venue state
       setVenue((prev) => ({
         ...prev,
-        reviews: prev.reviews.map(r => String(r._id) === String(reviewId) ? updatedReview : r)
+        reviews: prev.reviews.map((r) =>
+          String(r._id) === String(reviewId) ? updatedReview : r
+        ),
       }));
+
+      // Update the reviewer trust map for optimistic UI
+      if (reviewerData?._id) {
+        setReviewerTrustMap((prev) => ({
+          ...prev,
+          [String(reviewerData._id)]: {
+            reviewerTrustScore: reviewerData.reviewerTrustScore ?? 0,
+            status: reviewerData.status ?? "active",
+          },
+        }));
+      }
+
+      // Refresh the current user's own trust data (they voted, which may affect
+      // the reviewer they voted on — and their own status stays current)
+      refreshUser();
     } catch (err) {
-      console.error(">>> VOTE FAILED:", err);
+      if (err?.response?.status === 409) {
+        console.info(">>> Duplicate vote — already voted this type.");
+      } else {
+        console.error(">>> VOTE FAILED:", err);
+      }
     }
   };
 
@@ -116,6 +145,23 @@ export default function VenueDetails() {
       try {
         const data = await getVenueDetails(id);
         setVenue(data);
+
+        // Seed reviewerTrustMap from freshly populated userId on each review.
+        // This ensures we show the current trust score from the DB on first load,
+        // not a stale value stored on the Review document itself.
+        if (Array.isArray(data.reviews)) {
+          const initialTrustMap = {};
+          for (const review of data.reviews) {
+            const rid = String(review.userId?._id || review.userId || "");
+            if (rid && review.userId?.reviewerTrustScore !== undefined) {
+              initialTrustMap[rid] = {
+                reviewerTrustScore: review.userId.reviewerTrustScore,
+                status: review.userId.status ?? "active",
+              };
+            }
+          }
+          setReviewerTrustMap(initialTrustMap);
+        }
       } catch (err) {
         setError("Venue not found");
       }
@@ -348,25 +394,116 @@ export default function VenueDetails() {
                         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-brand-light text-brand font-bold uppercase">
                           {r.userId?.name ? r.userId.name[0] : "U"}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star 
-                                key={i} 
-                                className={`w-3.5 h-3.5 ${i < r.rating ? "text-orange-400 fill-current" : "text-slate-200"}`} 
-                              />
-                            ))}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-800">{r.userId?.name || "Anonymous"}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <div className="flex items-center gap-0.5">
+                              {[...Array(5)].map((_, i) => (
+                                <Star 
+                                  key={i} 
+                                  className={`w-3.5 h-3.5 ${i < r.rating ? "text-orange-400 fill-current" : "text-slate-200"}`} 
+                                />
+                              ))}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Verified Visit</span>
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">Verified Visit</p>
                         </div>
+                        {/* Reviewer trust badge — shows optimistically updated score */}
+                        {(() => {
+                          const reviewerIdStr = String(r.userId?._id || r.userId || "");
+                          const trustData = reviewerTrustMap[reviewerIdStr];
+                          if (!reviewerIdStr) return null;
+                          // Priority: optimistic map (post-vote) → populated userId field (fresh from DB) → null (hide badge)
+                          const score = trustData?.reviewerTrustScore ?? r.userId?.reviewerTrustScore ?? null;
+                          const status = trustData?.status ?? r.userId?.status ?? "active";
+                          if (score === null) return null;
+                          return (
+                            <div className="flex flex-col items-end gap-1">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  score >= 0
+                                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                                    : "bg-red-50 text-red-700 ring-1 ring-red-200"
+                                }`}
+                                title="Reviewer trust score"
+                              >
+                                ⭐ {score >= 0 ? "+" : ""}{score}
+                              </span>
+                              {status === "blocked" && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 ring-1 ring-red-300">
+                                  🚫 Blocked
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
-                      {/* New: Suspicious Badge */}
-                      {r.isSuspicious && (
-                        <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-lg border border-red-100 mb-3 w-fit">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider">Potentially Fake</span>
-                        </div>
-                      )}
+                      {/* ── Three-tier AI Classification Badge ── */}
+                      {(() => {
+                        const cls = r.suspicionClassification || (r.isSuspicious ? "suspicious" : "genuine");
+                        const score = r.suspicionScore ?? r.mlScore;
+                        const pct = score !== undefined ? Math.round(score * 100) : null;
+
+                        if (cls === "highly_suspicious") {
+                          return (
+                            <div className="flex items-center gap-2 mb-3 flex-wrap">
+                              <div
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border-red-300"
+                                title={`AI suspicion score: ${pct}%`}
+                              >
+                                <AlertCircle className="w-3 h-3" />
+                                AI: {pct}%
+                              </div>
+                              <div className="flex items-center gap-1.5 px-3 py-1 bg-red-100 text-red-700 rounded-lg border border-red-300">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">🚫 Highly Suspicious</span>
+                              </div>
+                              {(r.flags || []).map((f) => (
+                                <span key={f} className="text-[9px] px-1.5 py-0.5 bg-red-50 text-red-500 border border-red-200 rounded-full uppercase tracking-wide">
+                                  {f.replace(/_/g, " ")}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        }
+
+                        if (cls === "suspicious") {
+                          return (
+                            <div className="flex items-center gap-2 mb-3 flex-wrap">
+                              <div
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border-amber-200"
+                                title={`AI suspicion score: ${pct}%`}
+                              >
+                                <AlertCircle className="w-3 h-3" />
+                                AI: {pct}%
+                              </div>
+                              <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-lg border border-amber-200">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">⚠ Suspicious</span>
+                              </div>
+                              {(r.flags || []).map((f) => (
+                                <span key={f} className="text-[9px] px-1.5 py-0.5 bg-amber-50 text-amber-500 border border-amber-200 rounded-full uppercase tracking-wide">
+                                  {f.replace(/_/g, " ")}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        }
+
+                        // Genuine — show subtle grey AI score only
+                        return pct !== null ? (
+                          <div className="flex items-center gap-2 mb-3">
+                            <div
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider bg-slate-50 text-slate-400 border-slate-200"
+                              title={`AI suspicion score: ${pct}%`}
+                            >
+                              <AlertCircle className="w-3 h-3" />
+                              AI: {pct}%
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+
 
                       <p className="text-slate-600 text-sm leading-relaxed mb-3">{r.reviewText || "No comment provided."}</p>
                       
@@ -520,7 +657,7 @@ export default function VenueDetails() {
                 </div>
               </div>
 
-              {user ? (
+              {user && user.role !== "owner" ? (
                 <CrowdReportToggle 
                   venueId={venue._id} 
                   onReportSubmitted={(status) => {
@@ -533,11 +670,11 @@ export default function VenueDetails() {
                     }));
                   }}
                 />
-              ) : (
+              ) : !user ? (
                 <div className="mt-4 pt-4 border-t border-slate-100 text-center text-sm text-slate-500">
                   Log in to report crowd levels
                 </div>
-              )}
+              ) : null}
             </section>
 
           </div>

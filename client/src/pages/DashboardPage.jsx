@@ -55,7 +55,7 @@ function StarRow({ value, size = "sm" }) {
 }
 
 export function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   /** What the user types (restaurant / food search) */
   const [queryInput, setQueryInput] = useState("");
   /** When set (after Search), venue requests are restaurants-only + this name filter. When empty, requests use coords + category pill only (no text filter). */
@@ -187,6 +187,12 @@ export function DashboardPage() {
 
   useEffect(() => {
     fetchCurrentLocation();
+  }, []);
+
+  // Refresh trust score data after login so badge is always up-to-date
+  useEffect(() => {
+    if (user) refreshUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -362,6 +368,33 @@ export function DashboardPage() {
               <div className="hidden text-right sm:block">
                 <p className="text-sm font-semibold text-slate-900">{user?.name || "Guest"}</p>
                 <p className="text-xs text-slate-500">{user?.email}</p>
+                {/* ── Trust Score Badge (non-owners only) ── */}
+                {user && user.role !== "owner" && user.role !== "admin" && (
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span
+                      id="trust-score-badge"
+                      title="Your reviewer trust score based on helpful/suspicious votes"
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        (user.reviewerTrustScore ?? 0) >= 0
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                          : "bg-red-50 text-red-700 ring-1 ring-red-200"
+                      }`}
+                    >
+                      ⭐ Trust: {(user.reviewerTrustScore ?? 0) >= 0 ? "+" : ""}
+                      {user.reviewerTrustScore ?? 0}
+                    </span>
+                    <span
+                      id="reviewer-status-pill"
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        user.status === "blocked"
+                          ? "bg-red-100 text-red-700 ring-1 ring-red-300"
+                          : "bg-green-100 text-green-700 ring-1 ring-green-300"
+                      }`}
+                    >
+                      {user.status === "blocked" ? "🚫 Blocked" : "✅ Active"}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
                 {initials}
@@ -371,7 +404,7 @@ export function DashboardPage() {
                   to="/owner/dashboard"
                   className="rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
                 >
-                  Global Dashboard
+                  Owner Dashboard
                 </Link>
               )}
               {user?.role === "owner" && (

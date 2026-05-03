@@ -6,7 +6,20 @@ import axios from "axios";
 
 vi.mock("axios");
 
-// Mock lucide-react to avoid any issues with heavy SVG components
+// PhotoUpload calls apiClient.get("/upload/signature"), and apiClient is built
+// on top of axios. Mock apiClient so the interceptor setup doesn't blow up.
+vi.mock("../services/apiClient", () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
+  },
+}));
+
+// Mock lucide-react to avoid heavy SVG imports
 vi.mock("lucide-react", () => ({
   Camera: () => <div data-testid="camera-icon" />,
   X: () => <div data-testid="x-icon" />,
@@ -24,11 +37,11 @@ describe("PhotoUpload", () => {
 
   const renderComponent = (props = {}) => {
     return render(
-      <PhotoUpload 
-        token={token} 
-        onUploadComplete={mockOnUploadComplete} 
-        maxPhotos={3} 
-        {...props} 
+      <PhotoUpload
+        token={token}
+        onUploadComplete={mockOnUploadComplete}
+        maxPhotos={3}
+        {...props}
       />
     );
   };
@@ -40,7 +53,7 @@ describe("PhotoUpload", () => {
 
   it("should display error if file type is invalid", async () => {
     renderComponent();
-    
+
     const file = new File(["dummy content"], "test.txt", { type: "text/plain" });
     const input = screen.getByLabelText(/Add a photo/i);
 
@@ -51,28 +64,31 @@ describe("PhotoUpload", () => {
     await waitFor(() => {
       expect(screen.getByText(/Only image files are allowed/i)).toBeInTheDocument();
     });
-    
+
     expect(mockOnUploadComplete).not.toHaveBeenCalled();
   });
 
   it("should upload file successfully", async () => {
-    axios.get.mockResolvedValue({
+    // apiClient.get is used internally for /upload/signature
+    const apiClient = (await import("../services/apiClient")).default;
+    apiClient.get.mockResolvedValue({
       data: {
         signature: "test-sig",
         timestamp: "123",
         cloudName: "testcloud",
-        apiKey: "testkey"
-      }
+        apiKey: "testkey",
+      },
     });
 
+    // axios.post is used for Cloudinary direct upload
     axios.post.mockResolvedValue({
       data: {
-        secure_url: "https://example.com/image.jpg"
-      }
+        secure_url: "https://example.com/image.jpg",
+      },
     });
 
     renderComponent();
-    
+
     const file = new File(["dummy image"], "test.jpg", { type: "image/jpeg" });
     const input = screen.getByLabelText(/Add a photo/i);
 
@@ -81,20 +97,22 @@ describe("PhotoUpload", () => {
     });
 
     await waitFor(() => {
-      expect(axios.get).toHaveBeenCalled();
+      expect(apiClient.get).toHaveBeenCalledWith("/upload/signature");
       expect(axios.post).toHaveBeenCalled();
-      expect(mockOnUploadComplete).toHaveBeenCalledWith(["https://example.com/image.jpg"]);
+      expect(mockOnUploadComplete).toHaveBeenCalledWith([
+        "https://example.com/image.jpg",
+      ]);
     });
   });
 
   it("should allow removing a photo", async () => {
     renderComponent({ currentPhotos: ["https://example.com/image.jpg"] });
-    
+
     const image = screen.getByAltText("Upload 0");
     expect(image).toBeInTheDocument();
-    
+
     const removeBtn = screen.getByRole("button");
-    
+
     act(() => {
       fireEvent.click(removeBtn);
     });
