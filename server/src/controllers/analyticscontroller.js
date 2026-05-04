@@ -68,29 +68,37 @@ export async function getOwnerDashboard(req, res) {
         reviews: v.reviewCount || 0
       }));
 
-    // 4. Crowd Trends aggregation
-    const crowdTrendsRaw = await CrowdAnalytics.aggregate([
+    // 4. Crowd Insight aggregation — group by dayOfWeek × hour
+    const heatmapRaw = await CrowdAnalytics.aggregate([
       { $match: { venueId: { $in: venueIds } } },
-      { 
+      {
         $group: {
-          _id: "$hour",
-          busyCount: { $sum: "$busyCount" },
-          quietCount: { $sum: "$quietCount" }
+          _id: { day: "$dayOfWeek", hour: "$hour" },
+          busyCount:  { $sum: "$busyCount" },
+          quietCount: { $sum: "$quietCount" },
+          total:      { $sum: "$totalReports" }
         }
       },
-      { $sort: { _id: 1 } }
+      { $sort: { "_id.day": 1, "_id.hour": 1 } }
     ]);
 
-    // Fill missing hours
-    const crowdTrends = [];
-    for (let i = 0; i < 24; i++) {
-      const match = crowdTrendsRaw.find(t => t._id === i);
-      crowdTrends.push({
-        hour: i,
-        timeLabel: `${i.toString().padStart(2, '0')}:00`,
-        busyCount: match ? match.busyCount : 0,
-        quietCount: match ? match.quietCount : 0
-      });
+    // Build a lookup map and zero-fill all 168 day×hour slots
+    const heatmapLookup = new Map(
+      heatmapRaw.map(d => [`${d._id.day}_${d._id.hour}`, d])
+    );
+
+    const crowdInsightMap = [];
+    for (let day = 0; day < 7; day++) {
+      for (let hour = 0; hour < 24; hour++) {
+        const entry = heatmapLookup.get(`${day}_${hour}`);
+        crowdInsightMap.push({
+          day,
+          hour,
+          busyCount:  entry ? entry.busyCount  : 0,
+          quietCount: entry ? entry.quietCount : 0,
+          total:      entry ? entry.total       : 0
+        });
+      }
     }
 
     // 5. Fetch recent reviews for detailed view
@@ -108,7 +116,7 @@ export async function getOwnerDashboard(req, res) {
         totalReviews
       },
       topVenues,
-      crowdTrends,
+      crowdInsightMap,
       allVenues: venues.map(v => ({
         _id: v._id,
         name: v.name,

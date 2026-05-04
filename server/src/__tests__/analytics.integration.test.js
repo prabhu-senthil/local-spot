@@ -104,7 +104,9 @@ describe("Analytics Integration", () => {
     expect(res.body.overview.totalVenues).toBe(2);
     expect(res.body.overview.totalReviews).toBe(15);
     expect(res.body.topVenues).toHaveLength(2);
-    expect(res.body.crowdTrends).toHaveLength(24);
-    expect(res.body.crowdTrends[12].busyCount).toBe(10);
+    expect(res.body.crowdInsightMap).toHaveLength(168); // 7 days × 24 hours
+    expect(res.body.crowdInsightMap[0]).toHaveProperty("busyCount");
+    expect(res.body.crowdInsightMap[0]).toHaveProperty("day");
+    expect(res.body.crowdInsightMap[0]).toHaveProperty("hour");
   });
 });

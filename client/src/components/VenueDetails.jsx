@@ -265,37 +265,6 @@ export default function VenueDetails() {
       <div className="max-w-5xl mx-auto px-6 -mt-6 relative z-20">
         
         {/* Quick Stats Bar */}
-        <div className="bg-white rounded-2xl shadow-card p-6 flex flex-wrap md:flex-nowrap gap-6 md:gap-12 items-center justify-between md:justify-start border border-slate-100">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-orange-50 text-orange-500">
-              <Star className="w-6 h-6 fill-current" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-800 leading-none">
-                {venue.avgRating ? venue.avgRating.toFixed(1) : "New"}
-              </p>
-              <p className="text-xs text-slate-500 font-medium mt-1">
-                {venue.reviewCount || 0} REVIEWS
-              </p>
-            </div>
-          </div>
-          
-          <div className="w-px h-12 bg-slate-100 hidden md:block"></div>
-          
-          <div className="flex items-center gap-4">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-green-50 text-green-600">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-800 leading-none">
-                {venue.trustScore || "TBD"}
-              </p>
-              <p className="text-xs text-slate-500 font-medium mt-1">
-                TRUST SCORE
-              </p>
-            </div>
-          </div>
-        </div>
 
         {user?.role === "owner" && !venue.ownerId && (
           <div className="mt-6">
@@ -383,7 +352,7 @@ export default function VenueDetails() {
             {/* Reviews */}
             <section>
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-slate-800">Community Reviews</h3>
+                <h3 className="text-lg font-bold text-slate-800">Reviews</h3>
               </div>
 
               {venue.reviews?.length > 0 ? (
@@ -560,19 +529,28 @@ export default function VenueDetails() {
               )}
 
               {user ? (
-                user.role === "owner" ? (
+                user.role === "owner" || user.role === "admin" ? (
                   <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-center text-sm text-amber-700">
-                    <p>Restaurant owners cannot submit reviews.</p>
+                    <p>{user.role === "owner" ? "Restaurant owners" : "Administrators"} cannot submit reviews.</p>
                   </div>
                 ) : (
                   <ReviewForm 
                     venueId={venue._id} 
                     onReviewSubmitted={(newReview) => {
-                      setVenue(prev => ({
-                        ...prev,
-                        reviews: [newReview, ...(prev.reviews || [])],
-                        reviewCount: (prev.reviewCount || 0) + 1
-                      }));
+                      setVenue(prev => {
+                        const oldTotal = prev.reviewCount || 0;
+                        const oldAvg = prev.avgRating || 0;
+                        const newTotal = oldTotal + 1;
+                        const newRating = newReview.rating || 0;
+                        const newAvg = ((oldAvg * oldTotal) + newRating) / newTotal;
+
+                        return {
+                          ...prev,
+                          reviews: [newReview, ...(prev.reviews || [])],
+                          reviewCount: newTotal,
+                          avgRating: newAvg
+                        };
+                      });
                     }}
                   />
                 )
@@ -587,31 +565,21 @@ export default function VenueDetails() {
           {/* Sidebar (Right Column) */}
           <div className="space-y-8">
             
-            {/* Opening Hours */}
+            {/* Rating Summary (Moved from top) */}
             <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-              <div className="flex items-center gap-2 mb-6">
-                <Clock className="w-5 h-5 text-brand" />
-                <h3 className="text-lg font-bold text-slate-800">Opening Hours</h3>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-orange-50 text-orange-500">
+                  <Star className="w-6 h-6 fill-current" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-800 leading-none">
+                    {venue.avgRating ? venue.avgRating.toFixed(1) : "New"}
+                  </p>
+                  <p className="text-xs text-slate-500 font-medium mt-1 uppercase tracking-wider">
+                    {venue.reviewCount || 0} Reviews
+                  </p>
+                </div>
               </div>
-              
-              {venue.openingHours ? (
-                <ul className="space-y-3">
-                  {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => {
-                    const hours = venue.openingHours[day];
-                    const isClosed = !hours || (!hours.open && !hours.close);
-                    return (
-                      <li key={day} className="flex justify-between items-center text-sm">
-                        <span className="capitalize text-slate-500 font-medium">{day}</span>
-                        <span className={`font-semibold ${isClosed ? "text-slate-400" : "text-slate-800"}`}>
-                          {isClosed ? "Closed" : `${hours.open} - ${hours.close}`}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="text-slate-500 text-sm italic">Hours not available</p>
-              )}
             </section>
 
             {/* Crowd Insights */}
@@ -657,7 +625,7 @@ export default function VenueDetails() {
                 </div>
               </div>
 
-              {user && user.role !== "owner" ? (
+              {user && user.role !== "owner" && user.role !== "admin" ? (
                 <CrowdReportToggle 
                   venueId={venue._id} 
                   onReportSubmitted={(status) => {
@@ -670,6 +638,10 @@ export default function VenueDetails() {
                     }));
                   }}
                 />
+              ) : user && (user.role === "owner" || user.role === "admin") ? (
+                <div className="mt-4 pt-4 border-t border-slate-100 text-center text-xs text-amber-600 font-medium italic">
+                  {user.role === "owner" ? "Owners" : "Admins"} cannot report crowd levels
+                </div>
               ) : !user ? (
                 <div className="mt-4 pt-4 border-t border-slate-100 text-center text-sm text-slate-500">
                   Log in to report crowd levels

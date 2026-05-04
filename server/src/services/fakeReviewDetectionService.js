@@ -18,8 +18,8 @@ const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8000";
 
 // ─── Thresholds ─────────────────────────────────────────────────────────────
 // The suspicionScore is the max of ML and heuristic signals, so 0.35 is a
-// meaningful floor — it means at least one signal is clearly elevated.
-const SUSPICIOUS_THRESHOLD = 0.30;
+// Meaningful floor — it means at least one signal is clearly elevated.
+const SUSPICIOUS_THRESHOLD = 0.25;
 const HIGHLY_SUSPICIOUS_THRESHOLD = 0.65;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

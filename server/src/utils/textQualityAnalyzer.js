@@ -66,12 +66,28 @@ export function detectExcessivePunctuation(text) {
   if (!text) return { penalty: 0, flagged: false, flag: "EXCESSIVE_PUNCTUATION" };
 
   const matches = text.match(/[!?]{4,}/g) || [];
-  const penalty = Math.min(0.3, matches.length > 0 ? 0.1 + (matches.length - 1) * 0.05 : 0);
+  return {
+    penalty: Math.min(0.3, matches.length > 0 ? 0.1 + (matches.length - 1) * 0.05 : 0),
+    flagged: matches.length > 0,
+    flag: "EXCESSIVE_PUNCTUATION",
+    detail: matches,
+  };
+}
+
+/**
+ * Detects repetitive characters within a word (e.g. "AAAAA", "zzzzzz").
+ * Adds +0.25 penalty if any word has 4+ consecutive identical characters.
+ */
+export function detectRepetitiveCharacters(text) {
+  if (!text) return { penalty: 0, flagged: false, flag: "REPETITIVE_CHARS" };
+
+  const matches = text.match(/(\w)\1{3,}/g) || [];
+  const penalty = Math.min(0.5, 0.25 * matches.length);
 
   return {
     penalty,
     flagged: matches.length > 0,
-    flag: "EXCESSIVE_PUNCTUATION",
+    flag: "REPETITIVE_CHARS",
     detail: matches,
   };
 }
@@ -107,6 +123,7 @@ export function analyzeTextQuality(text) {
   const checkers = [
     detectRepeatedWords(text),
     detectGibberish(text),
+    detectRepetitiveCharacters(text),
     detectExcessivePunctuation(text),
     detectShortReview(text),
   ];

@@ -120,7 +120,7 @@ describe("POST /api/crowd — Crowd Report Restrictions", () => {
       .send(VALID_BODY);
 
     expect(res.status).toBe(429);
-    expect(res.body.message).toMatch(/one crowd report per venue per hour/i);
+    expect(res.body.message).toMatch(/one crowd report per hour/i);
     expect(res.body).toHaveProperty("nextAllowedAt");
   });
 

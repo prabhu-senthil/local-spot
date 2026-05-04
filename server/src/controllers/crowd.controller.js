@@ -6,27 +6,26 @@ export async function createCrowdReport(req, res) {
     const { venueId, status } = req.body;
     const userId = req.user.id;
 
-    // ── Guard 1: Owners cannot submit crowd reports ───────────────────────
-    if (req.user.role === "owner") {
+    // ── Guard 1: Owners and Admins cannot submit crowd reports ────────────
+    if (req.user.role === "owner" || req.user.role === "admin") {
       return res.status(403).json({
-        message: "Venue owners are not allowed to submit crowd reports."
+        message: `${req.user.role === "owner" ? "Venue owners" : "Administrators"} are not allowed to submit crowd reports.`
       });
     }
 
-    // ── Guard 2: 1 report per user per venue per calendar hour ────────────
+    // ── Guard 2: 1 report per user per calendar hour (any venue) ────────────
     const startOfHour = new Date();
     startOfHour.setMinutes(0, 0, 0); // floor to HH:00:00.000
 
     const existingThisHour = await CrowdReport.findOne({
       userId,
-      venueId,
       createdAt: { $gte: startOfHour }
     });
 
     if (existingThisHour) {
       const nextAllowedAt = new Date(startOfHour.getTime() + 60 * 60 * 1000);
       return res.status(429).json({
-        message: "You can only submit one crowd report per venue per hour.",
+        message: "You can only submit one crowd report per hour.",
         nextAllowedAt
       });
     }

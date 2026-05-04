@@ -17,6 +17,7 @@ const CATEGORY_TO_GEOAPIFY = {
   services: "service.beauty,service.hairdresser,service.car_repair",
   coffee: "catering.cafe",
   outdoors: "leisure.park",
+  top_picks: "catering.restaurant,catering.fast_food,catering.cafe,leisure.park",
 };  
 
 function getGeoapifyApiKey() {
@@ -77,7 +78,7 @@ function mapVenue(v) {
     longitude: v.geometry.coordinates[0],
     distanceMeters: v.properties.distance || null,
     distanceText:
-      typeof v.properties.distance === "number"
+      typeof v.properties.distance === "number" && v.properties.distance > 0
         ? `${(v.properties.distance / 1000).toFixed(1)} km`
         : "",
     rating: null, // Geoapify doesn't provide ratings
@@ -118,7 +119,18 @@ export async function getVenues(req, res, next) {
     // Geoapify: optional "name" narrows to places matching the name (e.g. pizza, Starbucks).
     if (nameFilter) url.searchParams.set("name", nameFilter);
 
-    const response = await fetch(url);
+    // Parallelize External API and Local DB Fetch
+    const [response, localVenuesInArea] = await Promise.all([
+      fetch(url),
+      Venue.find({
+        location: {
+          $near: {
+            $geometry: { type: "Point", coordinates: [lng, lat] },
+            $maxDistance: radius + 100 // buffer for safety
+          }
+        }
+      }).lean()
+    ]);
 
     if (!response.ok) {
       const body = await response.text();
@@ -128,35 +140,34 @@ export async function getVenues(req, res, next) {
     }
 
     const data = await response.json();
-
-    /* const venues = Array.isArray(data.features)
-      ? data.features.map(mapVenue)
-      : [];
-
-    return res.status(200).json(venues); */
     const venues = [];
+    const geoResults = data.features || [];
 
-    for (const feature of data.features) {
+    for (const feature of geoResults) {
       const mapped = mapVenue(feature);
 
-      // Check if venue already exists (by name + coordinates)
-      let existing = await Venue.findOne({
-        name: mapped.name,
-        location: {
-          $near: {
-            $geometry: {
-              type: "Point",
-              coordinates: [mapped.longitude, mapped.latitude],
-            },
-            $maxDistance: 10, // meters
-          },
-        },
-      });
+      // Try to find a match in the locally fetched array first
+      let existing = localVenuesInArea.find(lv => 
+        lv.name === mapped.name && 
+        lv.location.coordinates[0] === mapped.longitude &&
+        lv.location.coordinates[1] === mapped.latitude
+      );
 
-      /*     findOne({
-            name: mapped.name,
-            "location.coordinates": [mapped.longitude, mapped.latitude],
-          }); */
+      // Fallback: If not found in precise match, check for near match (very rare now)
+      if (!existing) {
+        existing = await Venue.findOne({
+          name: mapped.name,
+          location: {
+            $near: {
+              $geometry: {
+                type: "Point",
+                coordinates: [mapped.longitude, mapped.latitude],
+              },
+              $maxDistance: 10, // meters
+            },
+          },
+        });
+      }
 
       if (!existing) {
         existing = await Venue.create({
@@ -170,7 +181,6 @@ export async function getVenues(req, res, next) {
         });
       }
 
-      //  return MongoDB _id
       venues.push({
         _id: existing._id,
         name: existing.name,
@@ -179,7 +189,14 @@ export async function getVenues(req, res, next) {
         latitude: mapped.latitude,
         longitude: mapped.longitude,
         distanceText: mapped.distanceText,
+        avgRating: existing.avgRating || 0,
+        reviewCount: existing.reviewCount || 0,
       });
+    }
+
+    // Sort by rating if Top Picks
+    if (req.query.category === "top_picks") {
+      venues.sort((a, b) => b.avgRating - a.avgRating);
     }
 
     return res.status(200).json(venues);
@@ -227,9 +244,6 @@ export const getVenueById = async (req, res, next) => {
       if (report.status === "quiet") quietCount++;
     }
 
-    // Generate a trust score (placeholder logic or calculate from reviews)
-    // For now, let's say base trust score is 80, adjusted slightly by reviews
-    const trustScore = 85;
 
     // Assemble the complete response object for the frontend
     const responseData = {
@@ -238,8 +252,7 @@ export const getVenueById = async (req, res, next) => {
       crowd: {
         busy: busyCount,
         quiet: quietCount
-      },
-      trustScore: trustScore
+      }
     };
 
     res.json(responseData);

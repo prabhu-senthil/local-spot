@@ -25,7 +25,9 @@ const CrowdSchema = new mongoose.Schema({
   }
 });
 
-// Efficient lookup for per-user rate limiting
-CrowdSchema.index({ userId: 1, venueId: 1, createdAt: 1 });
+// Efficient per-user rate limit lookup (user-global, not venue-scoped)
+CrowdSchema.index({ userId: 1, createdAt: 1 });
+// Efficient venue-level analytics aggregation
+CrowdSchema.index({ venueId: 1, createdAt: 1 });
 
 export default mongoose.model("CrowdReport", CrowdSchema);
