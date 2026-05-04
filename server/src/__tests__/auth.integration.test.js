@@ -10,16 +10,13 @@ describe("Role-Based Access Control Integration Tests", () => {
   let testVenueId;
 
   beforeAll(async () => {
-    // We do not connect or disconnect mongoose here if server.js does it, 
-    // or we assume memory server is handled by jest setup.
-    // If not, we rely on the standard setup for these tests.
+
   });
 
   beforeEach(async () => {
     await User.deleteMany({});
     await Venue.deleteMany({});
 
-    // Create Admin
     const adminRes = await request(app).post("/api/auth/register").send({
       name: "Admin User",
       email: "admin@test.com",
@@ -28,7 +25,6 @@ describe("Role-Based Access Control Integration Tests", () => {
     });
     adminToken = adminRes.body.token;
 
-    // Create Owner
     const ownerRes = await request(app).post("/api/auth/register").send({
       name: "Owner User",
       email: "owner@test.com",
@@ -37,7 +33,6 @@ describe("Role-Based Access Control Integration Tests", () => {
     });
     ownerToken = ownerRes.body.token;
 
-    // Create Reviewer
     const reviewerRes = await request(app).post("/api/auth/register").send({
       name: "Reviewer User",
       email: "reviewer@test.com",
@@ -89,7 +84,7 @@ describe("Role-Based Access Control Integration Tests", () => {
       .get("/api/analytics/dashboard")
       .set("Authorization", `Bearer ${reviewerToken}`);
 
-    expect(res.status).toBe(401); // or 403 based on authorizeRoles implementation
+    expect(res.status).toBe(401);
   });
 
   it("Owner should be able to access owner dashboard analytics", async () => {
