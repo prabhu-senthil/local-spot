@@ -529,9 +529,9 @@ export default function VenueDetails() {
               )}
 
               {user ? (
-                user.role === "owner" ? (
+                user.role === "owner" || user.role === "admin" ? (
                   <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-center text-sm text-amber-700">
-                    <p>Restaurant owners cannot submit reviews.</p>
+                    <p>{user.role === "owner" ? "Restaurant owners" : "Administrators"} cannot submit reviews.</p>
                   </div>
                 ) : (
                   <ReviewForm 
@@ -625,7 +625,7 @@ export default function VenueDetails() {
                 </div>
               </div>
 
-              {user && user.role !== "owner" ? (
+              {user && user.role !== "owner" && user.role !== "admin" ? (
                 <CrowdReportToggle 
                   venueId={venue._id} 
                   onReportSubmitted={(status) => {
@@ -638,6 +638,10 @@ export default function VenueDetails() {
                     }));
                   }}
                 />
+              ) : user && (user.role === "owner" || user.role === "admin") ? (
+                <div className="mt-4 pt-4 border-t border-slate-100 text-center text-xs text-amber-600 font-medium italic">
+                  {user.role === "owner" ? "Owners" : "Admins"} cannot report crowd levels
+                </div>
               ) : !user ? (
                 <div className="mt-4 pt-4 border-t border-slate-100 text-center text-sm text-slate-500">
                   Log in to report crowd levels

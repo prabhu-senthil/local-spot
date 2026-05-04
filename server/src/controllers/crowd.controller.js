@@ -6,10 +6,10 @@ export async function createCrowdReport(req, res) {
     const { venueId, status } = req.body;
     const userId = req.user.id;
 
-    // ── Guard 1: Owners cannot submit crowd reports ───────────────────────
-    if (req.user.role === "owner") {
+    // ── Guard 1: Owners and Admins cannot submit crowd reports ────────────
+    if (req.user.role === "owner" || req.user.role === "admin") {
       return res.status(403).json({
-        message: "Venue owners are not allowed to submit crowd reports."
+        message: `${req.user.role === "owner" ? "Venue owners" : "Administrators"} are not allowed to submit crowd reports.`
       });
     }
 

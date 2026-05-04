@@ -119,7 +119,18 @@ export async function getVenues(req, res, next) {
     // Geoapify: optional "name" narrows to places matching the name (e.g. pizza, Starbucks).
     if (nameFilter) url.searchParams.set("name", nameFilter);
 
-    const response = await fetch(url);
+    // Parallelize External API and Local DB Fetch
+    const [response, localVenuesInArea] = await Promise.all([
+      fetch(url),
+      Venue.find({
+        location: {
+          $near: {
+            $geometry: { type: "Point", coordinates: [lng, lat] },
+            $maxDistance: radius + 100 // buffer for safety
+          }
+        }
+      }).lean()
+    ]);
 
     if (!response.ok) {
       const body = await response.text();
@@ -129,35 +140,34 @@ export async function getVenues(req, res, next) {
     }
 
     const data = await response.json();
-
-    /* const venues = Array.isArray(data.features)
-      ? data.features.map(mapVenue)
-      : [];
-
-    return res.status(200).json(venues); */
     const venues = [];
+    const geoResults = data.features || [];
 
-    for (const feature of data.features) {
+    for (const feature of geoResults) {
       const mapped = mapVenue(feature);
 
-      // Check if venue already exists (by name + coordinates)
-      let existing = await Venue.findOne({
-        name: mapped.name,
-        location: {
-          $near: {
-            $geometry: {
-              type: "Point",
-              coordinates: [mapped.longitude, mapped.latitude],
-            },
-            $maxDistance: 10, // meters
-          },
-        },
-      });
+      // Try to find a match in the locally fetched array first
+      let existing = localVenuesInArea.find(lv => 
+        lv.name === mapped.name && 
+        lv.location.coordinates[0] === mapped.longitude &&
+        lv.location.coordinates[1] === mapped.latitude
+      );
 
-      /*     findOne({
-            name: mapped.name,
-            "location.coordinates": [mapped.longitude, mapped.latitude],
-          }); */
+      // Fallback: If not found in precise match, check for near match (very rare now)
+      if (!existing) {
+        existing = await Venue.findOne({
+          name: mapped.name,
+          location: {
+            $near: {
+              $geometry: {
+                type: "Point",
+                coordinates: [mapped.longitude, mapped.latitude],
+              },
+              $maxDistance: 10, // meters
+            },
+          },
+        });
+      }
 
       if (!existing) {
         existing = await Venue.create({
@@ -171,7 +181,6 @@ export async function getVenues(req, res, next) {
         });
       }
 
-      //  return MongoDB _id
       venues.push({
         _id: existing._id,
         name: existing.name,

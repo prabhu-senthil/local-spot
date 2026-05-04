@@ -11,10 +11,10 @@ export async function createReview(req, res) {
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    if (userRole === "owner") {
+    if (userRole === "owner" || userRole === "admin") {
       return res
         .status(403)
-        .json({ message: "Restaurant owners cannot submit reviews." });
+        .json({ message: `${userRole === "owner" ? "Restaurant owners" : "Administrators"} cannot submit reviews.` });
     }
 
     // ── Blocked-user guard ──────────────────────────────────────────────────
@@ -56,6 +56,9 @@ export async function createReview(req, res) {
 
     // Recalculate trust score for the venue asynchronously
     calculateTrust(venueId).catch(console.error);
+
+    // Update reviewer trust score and evaluate for role upgrade asynchronously
+    applyTrustAndBlocking(userId).catch(console.error);
 
     // Populate user info for the newly created review before returning
     await newReview.populate("userId", "name reviewerTrustScore status");
@@ -137,7 +140,7 @@ export async function voteOnReview(req, res) {
     }
 
     await review.save();
-    
+
     // Populate the userId so the frontend has the reviewer's name
     await review.populate("userId", "name reviewerTrustScore status");
 

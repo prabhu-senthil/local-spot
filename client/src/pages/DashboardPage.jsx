@@ -91,6 +91,17 @@ export function DashboardPage() {
     [user?.name]
   );
 
+  const previousRole = useRef(user?.role);
+  const [showPromotionToast, setShowPromotionToast] = useState(false);
+
+  useEffect(() => {
+    if (user && previousRole.current === "user" && user.role === "reviewer") {
+      setShowPromotionToast(true);
+      setTimeout(() => setShowPromotionToast(false), 8000);
+    }
+    previousRole.current = user?.role;
+  }, [user]);
+
   const reverseGeocode = async (lat, lng, signal) => {
     if (!MAPBOX_TOKEN) return "";
     const geocodeUrl = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`);
@@ -206,6 +217,21 @@ export function DashboardPage() {
       fetchCurrentLocation();
     }
   }, []);
+
+  // Debounce query input to activeQuery for "search as you type"
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const trimmed = queryInput.trim();
+      if (trimmed !== activeQuery) {
+        setActiveQuery(trimmed);
+        // If searching by name, force the category to restaurants for better results
+        if (trimmed.length > 0) {
+          setActiveCategory("restaurants");
+        }
+      }
+    }, 500); // 500ms delay
+    return () => clearTimeout(timer);
+  }, [queryInput, activeQuery]);
 
   // Refresh trust score data after login so badge is always up-to-date
   useEffect(() => {
@@ -386,8 +412,8 @@ export function DashboardPage() {
               <div className="hidden text-right sm:block">
                 <p className="text-sm font-semibold text-slate-900">{user?.name || "Guest"}</p>
                 <p className="text-xs text-slate-500">{user?.email}</p>
-                {/* ── Trust Score Badge (non-owners only) ── */}
-                {user && user.role !== "owner" && user.role !== "admin" && (
+                {/* ── Trust Score Badge (Reviewers only) ── */}
+                {user && user.role === "reviewer" && (
                   <div className="mt-1 flex items-center gap-1.5">
                     <span
                       id="trust-score-badge"
@@ -417,10 +443,10 @@ export function DashboardPage() {
               </div>
               {user?.role === "admin" && (
                 <Link
-                  to="/owner/dashboard"
-                  className="rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                  to="/admin"
+                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
                 >
-                  Owner Dashboard
+                  Admin Control
                 </Link>
               )}
               {user?.role === "owner" && (
@@ -607,6 +633,16 @@ export function DashboardPage() {
           </aside>
         </div>
       </div>
+      {/* ── Promotion Toast ── */}
+      {showPromotionToast && (
+        <div className="fixed bottom-4 right-4 z-50 bg-brand text-white px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-bounce">
+          <span className="text-2xl">🎉</span>
+          <div>
+            <p className="font-bold">Congratulations!</p>
+            <p className="text-sm">You are now an official Reviewer!</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

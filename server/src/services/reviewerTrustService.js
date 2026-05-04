@@ -34,11 +34,15 @@ export async function calculateReviewerTrust(reviewerId) {
   for (const review of reviews) {
     helpfulCount += (review.helpfulVotes || []).length;
     suspiciousCount += (review.suspiciousVotes || []).length;
-    
+
     // Automatic penalty for AI-flagged suspicious reviews
-    // This connects the "repeated words" logic directly to the user's trust score
-    if (review.isSuspicious) {
-      suspiciousCount += 2; 
+    if (review.suspicionClassification === "highly_suspicious") {
+      suspiciousCount += 3;
+    } else if (review.suspicionClassification === "suspicious") {
+      suspiciousCount += 1;
+    } else if (review.isSuspicious) {
+      // Fallback for older reviews without classification
+      suspiciousCount += 2;
     }
   }
 
@@ -91,6 +95,9 @@ export async function applyTrustAndBlocking(reviewerId) {
     flagReviewsForBlockedUser(reviewerId).catch(console.error);
   }
 
+  // Check role upgrade after applying trust updates
+  evaluateUserRole(reviewerId).catch(console.error);
+
   return { trustScore: score, status: updatedUser.status };
 }
 
@@ -111,4 +118,66 @@ export async function flagReviewsForBlockedUser(userId) {
     `[TrustService] Flagged ${result.modifiedCount} reviews for blocked user ${userId}.`
   );
   return result;
+}
+
+// ─── 4. Automatic Role Evaluation ─────────────────────────────────────────
+
+/**
+ * Evaluates a user's review history and upgrades their role from 'user' to 'reviewer'
+ * if they meet the strict quality thresholds.
+ *
+ * @param {string|ObjectId} userId
+ */
+export async function evaluateUserRole(userId) {
+  try {
+    const User = (await import("../models/User.js")).default;
+    const user = await User.findById(userId);
+
+    if (!user) return;
+
+    // We only evaluate standard users for promotion
+    if (user.role !== "user") return;
+
+    const reviews = await Review.find({ userId }).lean();
+    if (reviews.length === 0) return;
+
+    let genuineCount = 0;
+    let totalMlScore = 0;
+    let helpfulCount = 0;
+    let suspiciousCount = 0;
+
+    for (const review of reviews) {
+      if (review.suspicionClassification === "genuine" || (!review.isSuspicious && !review.suspicionClassification)) {
+        genuineCount++;
+      }
+      totalMlScore += (review.suspicionScore || review.mlScore || 0);
+      helpfulCount += (review.helpfulVotes || []).length;
+      suspiciousCount += (review.suspiciousVotes || []).length;
+    }
+
+    const avgMlFakeProbability = totalMlScore / reviews.length;
+    const totalVotes = helpfulCount + suspiciousCount;
+    const suspiciousVoteRatio = totalVotes > 0 ? suspiciousCount / totalVotes : 0;
+
+    // 1. Update tracking fields on User
+    await User.findByIdAndUpdate(userId, {
+      genuineReviewCount: genuineCount,
+      avgMlFakeProbability,
+      suspiciousVoteRatio
+    });
+
+    // 2. Evaluate Promotion Criteria
+    const isEligible = 
+      genuineCount >= 5 &&
+      avgMlFakeProbability < 0.3 &&
+      suspiciousVoteRatio < 0.20;
+
+    if (isEligible) {
+      await User.findByIdAndUpdate(userId, { role: "reviewer" });
+      console.log(`[TrustService] 🚀 User ${userId} promoted to REVIEWER!`);
+      // Note: Frontend handles user notification on next session load/refresh
+    }
+  } catch (error) {
+    console.error(`[TrustService] Error evaluating role for user ${userId}:`, error);
+  }
 }

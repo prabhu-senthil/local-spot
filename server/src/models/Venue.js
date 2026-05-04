@@ -62,11 +62,20 @@ const venueSchema = new mongoose.Schema(
       peakHours: [Number],
       lastUpdated: Date,
     },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "approved",
+    },
   },
   { timestamps: true }
 );
 
 // GEO INDEX (IMPORTANT)
 venueSchema.index({ location: "2dsphere" });
+
+// SEARCH INDEXES (NEW: For Performance)
+venueSchema.index({ name: "text", category: "text", address: "text" });
+venueSchema.index({ name: 1 });
 
 export default mongoose.model("Venue", venueSchema);

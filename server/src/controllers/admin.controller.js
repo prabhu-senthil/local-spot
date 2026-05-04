@@ -1,10 +1,99 @@
-/**
- * admin.controller.js
- * Admin-only endpoints for monitoring reviewer trust metrics.
- */
-
 import User from "../models/User.js";
 import Review from "../models/Review.js";
+import Venue from "../models/Venue.js";
+import CrowdReport from "../models/CrowdReport.js";
+import CrowdAnalytics from "../models/CrowdAnalytics.js";
+import bcrypt from "bcryptjs";
+
+/**
+ * GET /api/admin/users
+ * Returns a list of all users with optional filtering by role.
+ */
+export async function getAllUsers(req, res) {
+  try {
+    const { role, status } = req.query;
+    const filter = {};
+    if (role) filter.role = role;
+    if (status) filter.status = status;
+
+    const users = await User.find(filter, "-passwordHash")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json(users);
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    return res.status(500).json({ message: "Failed to fetch users." });
+  }
+}
+
+/**
+ * PATCH /api/admin/users/:userId/status
+ * Updates a user's account status (active, blocked).
+ */
+export async function updateUserStatus(req, res) {
+  try {
+    const { userId } = req.params;
+    const { status } = req.body;
+
+    if (!["active", "blocked"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status." });
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { status }, { new: true }).select("-passwordHash");
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    return res.status(200).json({ message: `User status updated to ${status}.`, user });
+  } catch (err) {
+    console.error("Error updating user status:", err);
+    return res.status(500).json({ message: "Failed to update user status." });
+  }
+}
+
+/**
+ * PATCH /api/admin/users/:userId/role
+ * Promotes or changes a user's role.
+ */
+export async function updateUserRole(req, res) {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!["user", "reviewer", "owner", "admin"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role." });
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { role }, { new: true }).select("-passwordHash");
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    return res.status(200).json({ message: `User role updated to ${role}.`, user });
+  } catch (err) {
+    console.error("Error updating user role:", err);
+    return res.status(500).json({ message: "Failed to update user role." });
+  }
+}
+
+/**
+ * POST /api/admin/users/:userId/reset-password
+ * Resets a user's password to a temporary default.
+ */
+export async function resetUserPassword(req, res) {
+  try {
+    const { userId } = req.params;
+    const tempPassword = "Password123!";
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    const user = await User.findByIdAndUpdate(userId, { passwordHash }, { new: true });
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    return res.status(200).json({ 
+      message: `Password reset successfully for ${user.email}. Temporary password: ${tempPassword}` 
+    });
+  } catch (err) {
+    console.error("Error resetting password:", err);
+    return res.status(500).json({ message: "Failed to reset password." });
+  }
+}
 
 /**
  * GET /api/admin/trust-metrics
@@ -123,5 +212,375 @@ export async function getSuspiciousReviews(req, res) {
   } catch (err) {
     console.error("Error fetching suspicious reviews:", err);
     return res.status(500).json({ message: "Failed to fetch suspicious reviews." });
+  }
+}
+
+/**
+ * GET /api/admin/reviews
+ * Returns all reviews, sorted by creation date.
+ */
+export async function getAllReviews(req, res) {
+  try {
+    const { limit = 50, skip = 0 } = req.query;
+    const reviews = await Review.find()
+      .populate("userId", "name email")
+      .populate("venueId", "name")
+      .sort({ createdAt: -1 })
+      .skip(Number(skip))
+      .limit(Number(limit))
+      .lean();
+
+    const total = await Review.countDocuments();
+
+    return res.status(200).json({ reviews, total });
+  } catch (err) {
+    console.error("Error fetching reviews:", err);
+    return res.status(500).json({ message: "Failed to fetch reviews." });
+  }
+}
+
+/**
+ * DELETE /api/admin/reviews/:reviewId
+ * Deletes a review from the database.
+ */
+export async function deleteReview(req, res) {
+  try {
+    const { reviewId } = req.params;
+    const review = await Review.findByIdAndDelete(reviewId);
+    if (!review) return res.status(404).json({ message: "Review not found." });
+
+    return res.status(200).json({ message: "Review deleted successfully." });
+  } catch (err) {
+    console.error("Error deleting review:", err);
+    return res.status(500).json({ message: "Failed to delete review." });
+  }
+}
+
+/**
+ * PATCH /api/admin/reviews/:reviewId/override
+ * Overrides an ML suspicion flag, marking the review as genuine.
+ */
+export async function overrideReview(req, res) {
+  try {
+    const { reviewId } = req.params;
+    const review = await Review.findByIdAndUpdate(
+      reviewId,
+      {
+        isSuspicious: false,
+        suspicionClassification: "genuine",
+        suspicionScore: 0,
+        mlScore: 0
+      },
+      { new: true }
+    );
+    if (!review) return res.status(404).json({ message: "Review not found." });
+
+    return res.status(200).json({ message: "Review marked as genuine.", review });
+  } catch (err) {
+    console.error("Error overriding review:", err);
+    return res.status(500).json({ message: "Failed to override review." });
+  }
+}
+
+/**
+ * GET /api/admin/crowd-reports
+ * Returns all raw crowd reports, sorted by creation date.
+ */
+export async function getAllCrowdReports(req, res) {
+  try {
+    const { limit = 50 } = req.query;
+    const reports = await CrowdReport.find()
+      .populate("userId", "name email")
+      .populate("venueId", "name")
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .lean();
+
+    return res.status(200).json(reports);
+  } catch (err) {
+    console.error("Error fetching crowd reports:", err);
+    return res.status(500).json({ message: "Failed to fetch crowd reports." });
+  }
+}
+
+/**
+ * DELETE /api/admin/crowd-reports/:reportId
+ * Deletes a crowd report.
+ */
+export async function deleteCrowdReport(req, res) {
+  try {
+    const { reportId } = req.params;
+    const report = await CrowdReport.findByIdAndDelete(reportId);
+    if (!report) return res.status(404).json({ message: "Report not found." });
+
+    return res.status(200).json({ message: "Crowd report deleted successfully." });
+  } catch (err) {
+    console.error("Error deleting crowd report:", err);
+    return res.status(500).json({ message: "Failed to delete crowd report." });
+  }
+}
+
+/**
+ * POST /api/admin/venues/:venueId/crowd-reset
+ * Resets all crowd analytics and deletes all reports for a specific venue.
+ */
+export async function resetVenueCrowdData(req, res) {
+  try {
+    const { venueId } = req.params;
+
+    await Promise.all([
+      CrowdReport.deleteMany({ venueId }),
+      CrowdAnalytics.deleteMany({ venueId })
+    ]);
+
+    return res.status(200).json({ message: "Venue crowd data has been completely reset." });
+  } catch (err) {
+    console.error("Error resetting venue crowd data:", err);
+    return res.status(500).json({ message: "Failed to reset venue crowd data." });
+  }
+}
+
+/**
+ * GET /api/admin/venues
+ * Returns all venues with optional approvalStatus filter.
+ */
+export async function getAllAdminVenues(req, res) {
+  try {
+    const { sort = "-createdAt" } = req.query;
+    
+    // If sorting by owner name, we need an aggregation to join the users collection
+    if (sort === "ownerName" || sort === "-ownerName") {
+      const order = sort.startsWith("-") ? -1 : 1;
+      const venues = await Venue.aggregate([
+        {
+          $lookup: {
+            from: "users",
+            localField: "ownerId",
+            foreignField: "_id",
+            as: "owner"
+          }
+        },
+        {
+          $unwind: {
+            path: "$owner",
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
+          $addFields: {
+            ownerName: { $ifNull: ["$owner.name", "ZZZZZ"] } // Put unclaimed at the end
+          }
+        },
+        { $sort: { ownerName: order } }
+      ]);
+      
+      // Manually map to match the lean() populate structure if needed, 
+      // but usually the frontend handles the flat structure or we nested it.
+      // Let's ensure consistency by mapping back to an 'ownerId' object structure
+      const formatted = venues.map(v => ({
+        ...v,
+        ownerId: v.owner ? { _id: v.owner._id, name: v.owner.name, email: v.owner.email } : null
+      }));
+
+      return res.status(200).json(formatted);
+    }
+
+    const venues = await Venue.find({})
+      .populate("ownerId", "name email")
+      .sort(sort)
+      .lean();
+
+    return res.status(200).json(venues);
+  } catch (err) {
+    console.error("Error fetching admin venues:", err);
+    return res.status(500).json({ message: "Failed to fetch venues." });
+  }
+}
+
+/**
+ * PATCH /api/admin/venues/:venueId/approval
+ * Approves or rejects a venue claim.
+ */
+export async function updateVenueApproval(req, res) {
+  try {
+    const { venueId } = req.params;
+    const { approvalStatus } = req.body;
+
+    if (!["approved", "rejected", "pending"].includes(approvalStatus)) {
+      return res.status(400).json({ message: "Invalid approval status." });
+    }
+
+    const venue = await Venue.findByIdAndUpdate(venueId, { approvalStatus }, { new: true });
+    if (!venue) return res.status(404).json({ message: "Venue not found." });
+
+    return res.status(200).json({ message: `Venue ${approvalStatus} successfully.`, venue });
+  } catch (err) {
+    console.error("Error updating venue approval:", err);
+    return res.status(500).json({ message: "Failed to update venue approval." });
+  }
+}
+
+/**
+ * PATCH /api/admin/venues/:venueId/details
+ * Administrative edit of venue details.
+ */
+export async function updateVenueDetails(req, res) {
+  try {
+    const { venueId } = req.params;
+    const updates = req.body;
+
+    const venue = await Venue.findByIdAndUpdate(venueId, updates, { new: true });
+    if (!venue) return res.status(404).json({ message: "Venue not found." });
+
+    return res.status(200).json({ message: "Venue details updated.", venue });
+  } catch (err) {
+    console.error("Error updating venue details:", err);
+    return res.status(500).json({ message: "Failed to update venue details." });
+  }
+}
+
+/**
+ * DELETE /api/admin/venues/:venueId
+ * Permanently removes a venue and its associated data.
+ */
+export async function deleteVenue(req, res) {
+  try {
+    const { venueId } = req.params;
+    const venue = await Venue.findByIdAndDelete(venueId);
+    if (!venue) return res.status(404).json({ message: "Venue not found." });
+
+    // Cleanup associated data
+    await Promise.all([
+      Review.deleteMany({ venueId }),
+      CrowdReport.deleteMany({ venueId }),
+      CrowdAnalytics.deleteMany({ venueId })
+    ]);
+
+    return res.status(200).json({ message: "Venue and all associated data deleted." });
+  } catch (err) {
+    console.error("Error deleting venue:", err);
+    return res.status(500).json({ message: "Failed to delete venue." });
+  }
+}
+
+/**
+ * POST /api/admin/venues/merge
+ * Merges source venue into target venue.
+ */
+export async function mergeVenues(req, res) {
+  try {
+    const { sourceId, targetId } = req.body;
+    if (!sourceId || !targetId) return res.status(400).json({ message: "Source and Target IDs required." });
+
+    const [source, target] = await Promise.all([
+      Venue.findById(sourceId),
+      Venue.findById(targetId)
+    ]);
+
+    if (!source || !target) return res.status(404).json({ message: "One or both venues not found." });
+
+    // Transfer reviews and reports
+    await Promise.all([
+      Review.updateMany({ venueId: sourceId }, { venueId: targetId }),
+      CrowdReport.updateMany({ venueId: sourceId }, { venueId: targetId }),
+      CrowdAnalytics.deleteMany({ venueId: sourceId }) // Target will have its own analytics
+    ]);
+
+    // Recalculate target stats
+    const reviews = await Review.find({ venueId: targetId });
+    target.reviewCount = reviews.length;
+    target.avgRating = reviews.length > 0 
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
+      : 0;
+    await target.save();
+
+    // Delete source
+    await Venue.findByIdAndDelete(sourceId);
+
+    return res.status(200).json({ message: "Venues merged successfully.", target });
+  } catch (err) {
+    console.error("Merge error:", err);
+    return res.status(500).json({ message: "Failed to merge venues." });
+  }
+}
+
+/**
+ * PATCH /api/admin/users/:userId/trust-score
+ * Manually adjusts a user's trust score.
+ */
+export async function updateUserTrustScore(req, res) {
+  try {
+    const { userId } = req.params;
+    const { score } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { reviewerTrustScore: Number(score) },
+      { new: true }
+    ).select("name email reviewerTrustScore");
+
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    return res.status(200).json({ message: "Trust score adjusted.", user });
+  } catch (err) {
+    console.error("Error adjusting trust score:", err);
+    return res.status(500).json({ message: "Failed to adjust trust score." });
+  }
+}
+
+/**
+ * GET /api/admin/stats
+ * Returns platform-wide statistics for the admin dashboard.
+ */
+export async function getPlatformStats(req, res) {
+  try {
+    const [totalUsers, totalReviews, totalVenues] = await Promise.all([
+      User.countDocuments(),
+      Review.countDocuments(),
+      Venue.countDocuments()
+    ]);
+
+    // Review classification stats
+    const reviewStats = await Review.aggregate([
+      {
+        $group: {
+          _id: "$suspicionClassification",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Top venues by review count
+    const topVenues = await Venue.find()
+      .sort({ reviewCount: -1 })
+      .limit(5)
+      .select("name reviewCount avgRating")
+      .lean();
+
+    // Global crowd trends (busiest hours across platform)
+    const crowdTrends = await CrowdAnalytics.aggregate([
+      {
+        $group: {
+          _id: "$hour",
+          avgBusy: { $avg: "$busyCount" },
+          avgQuiet: { $avg: "$quietCount" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    return res.status(200).json({
+      overview: {
+        totalUsers,
+        totalReviews,
+        totalVenues
+      },
+      reviewStats,
+      topVenues,
+      crowdTrends
+    });
+  } catch (err) {
+    console.error("Error fetching platform stats:", err);
+    return res.status(500).json({ message: "Failed to fetch platform stats." });
   }
 }

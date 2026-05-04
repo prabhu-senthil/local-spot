@@ -81,7 +81,9 @@ export function AuthPage() {
         });
       }
 
-      if (userData.role === 'owner' || userData.role === 'admin') {
+      if (userData.role === 'admin') {
+        navigate("/admin", { replace: true });
+      } else if (userData.role === 'owner') {
         navigate("/owner/dashboard", { replace: true });
       } else {
         navigate("/dashboard", { replace: true });
