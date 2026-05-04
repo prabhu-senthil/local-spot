@@ -159,9 +159,8 @@ export function AuthPage() {
                 setLocalError("");
                 setError("");
               }}
-              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Sign in
             </button>
@@ -172,9 +171,8 @@ export function AuthPage() {
                 setLocalError("");
                 setError("");
               }}
-              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                mode === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${mode === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Register
             </button>
@@ -219,11 +217,14 @@ export function AuthPage() {
                   onChange={onChange}
                   className="input-field"
                 >
-                  {availableRoles.map((roleValue, index) => (
-                    <option key={roleValue} value={roleValue}>
-                      {displayRoles[index] || roleValue}
-                    </option>
-                  ))}
+                  {availableRoles.map((roleValue, index) => {
+                    if (roleValue === "admin") return null;
+                    return (
+                      <option key={roleValue} value={roleValue}>
+                        {displayRoles[index] || roleValue}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
             )}

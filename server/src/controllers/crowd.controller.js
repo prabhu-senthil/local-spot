@@ -13,20 +13,19 @@ export async function createCrowdReport(req, res) {
       });
     }
 
-    // ── Guard 2: 1 report per user per venue per calendar hour ────────────
+    // ── Guard 2: 1 report per user per calendar hour (any venue) ────────────
     const startOfHour = new Date();
     startOfHour.setMinutes(0, 0, 0); // floor to HH:00:00.000
 
     const existingThisHour = await CrowdReport.findOne({
       userId,
-      venueId,
       createdAt: { $gte: startOfHour }
     });
 
     if (existingThisHour) {
       const nextAllowedAt = new Date(startOfHour.getTime() + 60 * 60 * 1000);
       return res.status(429).json({
-        message: "You can only submit one crowd report per venue per hour.",
+        message: "You can only submit one crowd report per hour.",
         nextAllowedAt
       });
     }

@@ -4,14 +4,17 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useAuth } from "../contexts/AuthContext";
 import { searchNearbyVenues } from "../services/geoapify";
+import {
+  Star, StarHalf, Search, MapPin,
+  Navigation, User, LogOut, Store,
+  MessageSquare, Camera
+} from "lucide-react";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "";
 
 const CATEGORIES = [
+  { id: "top_picks", label: "Top Picks", icon: "✨" },
   { id: "restaurants", label: "Restaurants", icon: "🍽️" },
-  { id: "nightlife", label: "Nightlife", icon: "🍸" },
-  { id: "shopping", label: "Shopping", icon: "🛍️" },
-  { id: "services", label: "Services", icon: "💇" },
   { id: "coffee", label: "Coffee & Tea", icon: "☕" },
   { id: "outdoors", label: "Parks", icon: "🌳" },
 ];
@@ -38,35 +41,36 @@ const MOCK_REVIEWS = [
 function StarRow({ value, size = "sm" }) {
   const full = Math.floor(value);
   const half = value - full >= 0.5;
-  const starClass = size === "sm" ? "text-sm" : "text-base";
+  const starSize = size === "sm" ? 14 : 18;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-amber-500 ${starClass}`} aria-label={`${value} out of 5 stars`}>
+    <div className="flex items-center gap-0.5 text-orange-400" aria-label={`${value} out of 5 stars`}>
       {Array.from({ length: full }).map((_, i) => (
-        <span key={`f-${i}`}>★</span>
+        <Star key={`f-${i}`} size={starSize} className="fill-current" />
       ))}
-      {half && <span>½</span>}
+      {half && <StarHalf size={starSize} className="fill-current" />}
       {Array.from({ length: 5 - full - (half ? 1 : 0) }).map((_, i) => (
-        <span key={`e-${i}`} className="text-slate-300">
-          ★
-        </span>
+        <Star key={`e-${i}`} size={starSize} className="text-slate-200" />
       ))}
-    </span>
+    </div>
   );
 }
 
 export function DashboardPage() {
   const { user, logout, refreshUser } = useAuth();
   /** What the user types (restaurant / food search) */
-  const [queryInput, setQueryInput] = useState("");
-  /** When set (after Search), venue requests are restaurants-only + this name filter. When empty, requests use coords + category pill only (no text filter). */
-  const [activeQuery, setActiveQuery] = useState("");
+  const [queryInput, setQueryInput] = useState(() => sessionStorage.getItem("ls_queryInput") || "");
+  /** When set (after Search), venue requests are restaurants-only + this name filter. */
+  const [activeQuery, setActiveQuery] = useState(() => sessionStorage.getItem("ls_activeQuery") || "");
   /** Where to search — city, neighborhood, address, ZIP */
-  const [locationInput, setLocationInput] = useState("");
+  const [locationInput, setLocationInput] = useState(() => sessionStorage.getItem("ls_locationInput") || "");
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
-  const [activeCategory, setActiveCategory] = useState("restaurants");
-  const [coords, setCoords] = useState(null);
+  const [activeCategory, setActiveCategory] = useState(() => sessionStorage.getItem("ls_activeCategory") || "restaurants");
+  const [coords, setCoords] = useState(() => {
+    const saved = sessionStorage.getItem("ls_coords");
+    return saved ? JSON.parse(saved) : null;
+  });
   const [venues, setVenues] = useState([]);
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -185,8 +189,22 @@ export function DashboardPage() {
     }
   };
 
+  // Persist search state to sessionStorage
   useEffect(() => {
-    fetchCurrentLocation();
+    sessionStorage.setItem("ls_queryInput", queryInput);
+    sessionStorage.setItem("ls_activeQuery", activeQuery);
+    sessionStorage.setItem("ls_locationInput", locationInput);
+    sessionStorage.setItem("ls_activeCategory", activeCategory);
+    if (coords) {
+      sessionStorage.setItem("ls_coords", JSON.stringify(coords));
+    }
+  }, [queryInput, activeQuery, locationInput, activeCategory, coords]);
+
+  useEffect(() => {
+    // Only fetch current location if we don't have a saved one
+    if (!coords && !locationInput) {
+      fetchCurrentLocation();
+    }
   }, []);
 
   // Refresh trust score data after login so badge is always up-to-date
@@ -304,7 +322,7 @@ export function DashboardPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSearchRestaurants();
                 }}
-                placeholder="Pizza, sushi, brunch…"
+                placeholder="Search restaurants"
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
@@ -374,22 +392,20 @@ export function DashboardPage() {
                     <span
                       id="trust-score-badge"
                       title="Your reviewer trust score based on helpful/suspicious votes"
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        (user.reviewerTrustScore ?? 0) >= 0
-                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                          : "bg-red-50 text-red-700 ring-1 ring-red-200"
-                      }`}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${(user.reviewerTrustScore ?? 0) >= 0
+                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                        : "bg-red-50 text-red-700 ring-1 ring-red-200"
+                        }`}
                     >
                       ⭐ Trust: {(user.reviewerTrustScore ?? 0) >= 0 ? "+" : ""}
                       {user.reviewerTrustScore ?? 0}
                     </span>
                     <span
                       id="reviewer-status-pill"
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        user.status === "blocked"
-                          ? "bg-red-100 text-red-700 ring-1 ring-red-300"
-                          : "bg-green-100 text-green-700 ring-1 ring-green-300"
-                      }`}
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${user.status === "blocked"
+                        ? "bg-red-100 text-red-700 ring-1 ring-red-300"
+                        : "bg-green-100 text-green-700 ring-1 ring-green-300"
+                        }`}
                     >
                       {user.status === "blocked" ? "🚫 Blocked" : "✅ Active"}
                     </span>
@@ -475,20 +491,7 @@ export function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
           {/* Main column: filters + list */}
           <div className="space-y-4">
-            <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick filters</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["$$", "$$$", "Outdoor seating", "Good for groups", "Takes reservations"].map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-brand/40 hover:bg-white"
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </aside>
+
 
             {error && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -525,18 +528,16 @@ export function DashboardPage() {
                             <p className="text-sm text-slate-600">{v.category}</p>
                             {v.address && <p className="mt-1 text-xs text-slate-500">{v.address}</p>}
                           </div>
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                            {v.distanceText || "--"}
-                          </span>
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                          {typeof v.rating === "number" ? (
+                          {v.avgRating > 0 ? (
                             <>
-                              <StarRow value={v.rating} />
-                              <span className="text-slate-600">{v.rating.toFixed(1)} / 5</span>
+                              <StarRow value={v.avgRating} />
+                              <span className="text-slate-600 font-semibold">{v.avgRating.toFixed(1)}</span>
+                              <span className="text-slate-400">({v.reviewCount || 0} reviews)</span>
                             </>
                           ) : (
-                            <span className="text-slate-400">No rating yet</span>
+                            <span className="text-slate-400">No reviews yet</span>
                           )}
                           {v.price && (
                             <>

@@ -141,8 +141,8 @@ export async function voteOnReview(req, res) {
     // Populate the userId so the frontend has the reviewer's name
     await review.populate("userId", "name reviewerTrustScore status");
 
-    // ── Asynchronously recalculate reviewer's trust score ────────────────
-    applyTrustAndBlocking(review.userId).catch(console.error);
+    // ── Recalculate reviewer's trust score ────────────────
+    await applyTrustAndBlocking(review.userId);
 
     // ── Return updated review + fresh reviewer info ───────────────────────
     const User = (await import("../models/User.js")).default;

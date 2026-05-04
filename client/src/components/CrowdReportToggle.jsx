@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { submitCrowdReport } from "../services/crowdApi";
+import { useAuth } from "../contexts/AuthContext";
 
-const STORAGE_KEY = (venueId) => `crowdReport_${venueId}`;
+// Key is scoped to the user — different users on the same browser don't
+// interfere with each other's cooldown state.
+const STORAGE_KEY = (userId) => `crowdReport_${userId}_hourly`;
 
 function isWithinSameHour(isoTimestamp) {
   if (!isoTimestamp) return false;
@@ -18,21 +21,24 @@ function nextHourLabel() {
 }
 
 export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
+  const { user } = useAuth();
+  const userId = user?._id || user?.id || "anonymous";
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [lockedUntil, setLockedUntil] = useState(null); // ISO string of next-allowed time
+  const [lockedUntil, setLockedUntil] = useState(null);
 
-  // On mount: check if user already reported this venue this hour
+  // On mount or user/venue change: check if THIS user already reported this hour.
+  // Re-runs when userId changes (account switch) or venueId changes (navigation).
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY(venueId));
+    const stored = localStorage.getItem(STORAGE_KEY(userId));
     if (stored && isWithinSameHour(stored)) {
       setLockedUntil(stored);
     } else {
-      // Clear stale entry from previous hour
-      localStorage.removeItem(STORAGE_KEY(venueId));
+      localStorage.removeItem(STORAGE_KEY(userId));
       setLockedUntil(null);
     }
-  }, [venueId]);
+  }, [userId, venueId]);
 
   const handleReport = async (status) => {
     setIsSubmitting(true);
@@ -40,19 +46,19 @@ export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
 
     try {
       await submitCrowdReport(venueId, status);
-      // Lock UI and persist to localStorage
+      // Lock UI for this specific user and persist to localStorage
       const now = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEY(venueId), now);
+      localStorage.setItem(STORAGE_KEY(userId), now);
       setLockedUntil(now);
       if (onReportSubmitted) onReportSubmitted(status);
     } catch (err) {
       const data = err.response?.data;
       if (err.response?.status === 429 && data?.nextAllowedAt) {
-        // Server says duplicate — lock UI using server's nextAllowedAt
+        // Server confirmed duplicate — lock UI silently
         const now = new Date().toISOString();
-        localStorage.setItem(STORAGE_KEY(venueId), now);
+        localStorage.setItem(STORAGE_KEY(userId), now);
         setLockedUntil(now);
-        setError(""); // suppress error — the locked UI is self-explanatory
+        setError("");
       } else {
         setError(data?.message || "Failed to submit crowd report.");
       }
@@ -61,7 +67,7 @@ export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
     }
   };
 
-  // ── Locked state (already reported this hour) ─────────────────────────────
+  // ── Locked state (this user already reported this hour) ───────────────────
   if (lockedUntil && isWithinSameHour(lockedUntil)) {
     return (
       <div className="mt-4 pt-4 border-t border-slate-100">

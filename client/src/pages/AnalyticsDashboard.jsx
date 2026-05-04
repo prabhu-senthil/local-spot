@@ -3,8 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getOwnerDashboard } from "../services/analyticsApi";
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
-  LineChart, Line, CartesianGrid, Legend 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
 import { Store, Star, MessageSquare, Camera } from "lucide-react";
 import PhotoUpload from "../components/PhotoUpload";
@@ -27,6 +26,27 @@ export default function AnalyticsDashboard() {
   const [error, setError] = useState("");
   const [activeModal, setActiveModal] = useState(null); // 'venues' or 'reviews'
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
+  const [crowdView, setCrowdView] = useState(null); // unused — kept for safety
+  const [selectedDay, setSelectedDay] = useState(1); // 0=Sun…6=Sat, default Mon
+
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon→Sun for tab display
+
+  // Filter the 168-point heatmap to the selected day's 24 hourly bars
+  const crowdForDay = useMemo(() => {
+    const hrs = Array.from({ length: 24 }, (_, h) => ({
+      hour: `${String(h).padStart(2, "00")}:00`,
+      busy: 0,
+      quiet: 0,
+    }));
+    (data?.crowdInsightMap || [])
+      .filter(d => d.day === selectedDay)
+      .forEach(({ hour, busyCount, quietCount }) => {
+        hrs[hour].busy  = Math.max(0, busyCount);   // guard against stale negatives
+        hrs[hour].quiet = Math.max(0, quietCount);
+      });
+    return hrs;
+  }, [data?.crowdInsightMap, selectedDay]);
 
   useEffect(() => {
     if (!user) return;
@@ -138,9 +158,7 @@ export default function AnalyticsDashboard() {
                 Owner Dashboard
               </span>
               <h1 className="text-3xl md:text-5xl font-bold text-white tracking-tight">{data.restaurantInfo.name}</h1>
-              <p className="text-white/90 text-sm md:text-base mt-1">
-                {data.restaurantInfo.category ? `Overview and analytics for your ${data.restaurantInfo.category.toLowerCase()}.` : "Overview of your venues and analytics."}
-              </p>
+
             </div>
             {user?.role === "owner" && data?.allVenues?.[0]?._id && (
               <button 
@@ -183,7 +201,7 @@ export default function AnalyticsDashboard() {
               <Star className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-500">Global Avg Rating</p>
+              <p className="text-sm font-medium text-slate-500">Avg Rating</p>
               <p className="text-2xl font-bold text-slate-800">{data?.overview?.globalAvgRating || 0}</p>
             </div>
           </div>
@@ -202,36 +220,49 @@ export default function AnalyticsDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* TOP VENUES CHART */}
+        <div className="flex flex-col gap-8">
+          {/* CROWD ACTIVITY BAR CHART — X: Hours, Y: Busy count, filtered by day */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h2 className="text-lg font-bold text-slate-800 mb-6">Top Venues (Rating)</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data?.topVenues || []} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: 40 }}>
-                  <XAxis type="number" domain={[0, 5]} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={100} />
-                  <Tooltip />
-                  <Bar dataKey="rating" fill="#f97316" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-bold text-slate-800">Crowd Activity</h2>
+              {/* Day-of-week selector tabs */}
+              <div className="flex items-center gap-1 flex-wrap">
+                {DAY_ORDER.map(dayIdx => (
+                  <button
+                    key={dayIdx}
+                    onClick={() => setSelectedDay(dayIdx)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      selectedDay === dayIdx
+                        ? "bg-orange-500 text-white shadow-sm"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    }`}
+                  >
+                    {DAY_NAMES[dayIdx]}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-
-          {/* CROWD TRENDS CHART */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h2 className="text-lg font-bold text-slate-800 mb-6">Crowd Trends (24h)</h2>
-            <div className="h-64">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data?.crowdTrends || []} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="timeLabel" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="busyCount" name="Busy Reports" stroke="#ef4444" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="quietCount" name="Quiet Reports" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                </LineChart>
+                <BarChart
+                  data={crowdForDay}
+                  margin={{ top: 4, right: 8, bottom: 0, left: -10 }}
+                  barGap={2}
+                >
+                  <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    formatter={(value, name) => [value, name === "busy" ? "Busy" : "Quiet"]}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Legend
+                    formatter={(value) => value === "busy" ? "Busy" : "Quiet"}
+                    iconType="circle"
+                    iconSize={8}
+                  />
+                  <Bar dataKey="busy"  name="busy"  fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="quiet" name="quiet" fill="#3b82f6" radius={[3, 3, 0, 0]} maxBarSize={36} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -274,7 +305,7 @@ export default function AnalyticsDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-fade-in-up">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-800">Recent Reviews</h2>
+              <h3 className="text-lg font-bold text-slate-800">Reviews</h3>
               <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
             </div>
             <div className="p-6 overflow-y-auto flex-1">

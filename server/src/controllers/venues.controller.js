@@ -17,6 +17,7 @@ const CATEGORY_TO_GEOAPIFY = {
   services: "service.beauty,service.hairdresser,service.car_repair",
   coffee: "catering.cafe",
   outdoors: "leisure.park",
+  top_picks: "catering.restaurant,catering.fast_food,catering.cafe,leisure.park",
 };  
 
 function getGeoapifyApiKey() {
@@ -77,7 +78,7 @@ function mapVenue(v) {
     longitude: v.geometry.coordinates[0],
     distanceMeters: v.properties.distance || null,
     distanceText:
-      typeof v.properties.distance === "number"
+      typeof v.properties.distance === "number" && v.properties.distance > 0
         ? `${(v.properties.distance / 1000).toFixed(1)} km`
         : "",
     rating: null, // Geoapify doesn't provide ratings
@@ -179,7 +180,14 @@ export async function getVenues(req, res, next) {
         latitude: mapped.latitude,
         longitude: mapped.longitude,
         distanceText: mapped.distanceText,
+        avgRating: existing.avgRating || 0,
+        reviewCount: existing.reviewCount || 0,
       });
+    }
+
+    // Sort by rating if Top Picks
+    if (req.query.category === "top_picks") {
+      venues.sort((a, b) => b.avgRating - a.avgRating);
     }
 
     return res.status(200).json(venues);
@@ -227,9 +235,6 @@ export const getVenueById = async (req, res, next) => {
       if (report.status === "quiet") quietCount++;
     }
 
-    // Generate a trust score (placeholder logic or calculate from reviews)
-    // For now, let's say base trust score is 80, adjusted slightly by reviews
-    const trustScore = 85;
 
     // Assemble the complete response object for the frontend
     const responseData = {
@@ -238,8 +243,7 @@ export const getVenueById = async (req, res, next) => {
       crowd: {
         busy: busyCount,
         quiet: quietCount
-      },
-      trustScore: trustScore
+      }
     };
 
     res.json(responseData);
