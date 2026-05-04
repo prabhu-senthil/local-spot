@@ -1,28 +1,11 @@
-/**
- * CrowdInsightMap.jsx
- *
- * A 7-day × 24-hour heatmap showing crowd busyness by day and time.
- * - Rows  = days of the week (Mon → Sun)
- * - Columns = hours of the day (00 → 23)
- * - Cell colour intensity = busyCount at that slot
- *
- * Props:
- *   insightData — array of 168 objects: { day, hour, busyCount, quietCount, total }
- *                 day 0 = Sunday … day 6 = Saturday
- */
+
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAY_ORDER  = [1, 2, 3, 4, 5, 6, 0]; // Mon first, Sun last
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-/**
- * Maps a busyCount value to an HSL colour.
- * 0 reports → very light slate (nearly white)
- * max reports → deep brand orange-red
- */
 function heatColour(busyCount, maxBusy) {
-  if (maxBusy === 0 || busyCount === 0) return "#f1f5f9"; // slate-100 (empty)
-  const t = busyCount / maxBusy; // 0..1
-  // Hue 20 (orange) → 0 (red), saturation 70→100%, lightness 90→35%
+  if (maxBusy === 0 || busyCount === 0) return "#f1f5f9";
+  const t = busyCount / maxBusy;
   const h = Math.round(20 - t * 20);
   const s = Math.round(70 + t * 30);
   const l = Math.round(90 - t * 55);
@@ -34,7 +17,6 @@ function hourLabel(h) {
 }
 
 export default function CrowdInsightMap({ insightData = [] }) {
-  // Build a quick lookup: "day_hour" → busyCount
   const lookup = new Map(
     insightData.map((d) => [`${d.day}_${d.hour}`, d])
   );
@@ -42,8 +24,6 @@ export default function CrowdInsightMap({ insightData = [] }) {
   const busyCounts = insightData.map((d) => d.busyCount);
   const maxBusy = Math.max(0, ...busyCounts);
   const hasData = maxBusy > 0;
-
-  // Grid columns: 1 label col + 24 hour cols
   const gridStyle = {
     display: "grid",
     gridTemplateColumns: `3.5rem repeat(24, minmax(0, 1fr))`,
@@ -52,9 +32,8 @@ export default function CrowdInsightMap({ insightData = [] }) {
 
   return (
     <div className="w-full overflow-x-auto">
-      {/* Hour header row */}
       <div style={gridStyle} className="mb-1">
-        <div /> {/* empty corner */}
+        <div />
         {Array.from({ length: 24 }, (_, h) => (
           <div
             key={h}
@@ -65,20 +44,17 @@ export default function CrowdInsightMap({ insightData = [] }) {
         ))}
       </div>
 
-      {/* Day rows */}
       {DAY_ORDER.map((dayIdx) => (
         <div key={dayIdx} style={gridStyle} className="mb-0.5">
-          {/* Day label */}
           <div className="flex items-center justify-end pr-2 text-[10px] font-semibold text-slate-500 leading-none">
             {DAY_LABELS[dayIdx]}
           </div>
 
-          {/* 24 hour cells */}
           {Array.from({ length: 24 }, (_, hour) => {
             const entry = lookup.get(`${dayIdx}_${hour}`);
-            const busy   = entry?.busyCount  ?? 0;
-            const quiet  = entry?.quietCount ?? 0;
-            const total  = entry?.total      ?? 0;
+            const busy = entry?.busyCount ?? 0;
+            const quiet = entry?.quietCount ?? 0;
+            const total = entry?.total ?? 0;
             const colour = hasData ? heatColour(busy, maxBusy) : "#f1f5f9";
 
             return (
@@ -97,7 +73,6 @@ export default function CrowdInsightMap({ insightData = [] }) {
         </div>
       ))}
 
-      {/* Legend */}
       <div className="flex items-center justify-end gap-2 mt-3">
         <span className="text-[10px] text-slate-400">Low</span>
         <div
@@ -110,7 +85,6 @@ export default function CrowdInsightMap({ insightData = [] }) {
         <span className="text-[10px] text-slate-400">Busy</span>
       </div>
 
-      {/* Empty state note */}
       {!hasData && (
         <p className="text-center text-xs text-slate-400 mt-3">
           No crowd reports yet — the grid will fill as users check in.

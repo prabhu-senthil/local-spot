@@ -41,7 +41,6 @@ export function AuthProvider({ children }) {
         setUser(response.data);
         setError("");
       } catch (err) {
-        // Interceptor handles 401 refresh, so if we're here, refresh likely failed
         setUser(null);
         setToken(null);
         setError(err.response?.data?.message || "Failed to fetch current user.");
@@ -53,7 +52,6 @@ export function AuthProvider({ children }) {
     loadUser();
   }, [token]);
 
-  /** Re-fetch the current user's profile (including trust score + status). */
   const refreshUser = useCallback(async () => {
     if (!token) return;
     try {

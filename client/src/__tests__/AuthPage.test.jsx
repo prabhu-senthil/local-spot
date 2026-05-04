@@ -4,7 +4,6 @@ import { AuthPage } from "../pages/AuthPage";
 import { AuthProvider } from "../contexts/AuthContext";
 import { BrowserRouter } from "react-router-dom";
 
-// Mock the AuthContext so we can control login/register responses
 vi.mock("../contexts/AuthContext", async () => {
   const actual = await vi.importActual("../contexts/AuthContext");
   return {
@@ -15,7 +14,6 @@ vi.mock("../contexts/AuthContext", async () => {
 
 import { useAuth } from "../contexts/AuthContext";
 
-// Mock react-router-dom navigate
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
@@ -105,7 +103,7 @@ describe("AuthPage Role Redirects", () => {
     });
   });
 
-  it("should navigate to /owner/dashboard for admin role on login", async () => {
+  it("should navigate to /admin for admin role on login", async () => {
     const mockLogin = vi.fn().mockResolvedValue({ role: "admin" });
     useAuth.mockReturnValue({
       login: mockLogin,
@@ -126,7 +124,7 @@ describe("AuthPage Role Redirects", () => {
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith("/owner/dashboard", { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith("/admin", { replace: true });
     });
   });
 });

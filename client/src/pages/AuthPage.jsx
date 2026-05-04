@@ -99,7 +99,6 @@ export function AuthPage() {
 
   return (
     <div className="auth-shell flex min-h-screen flex-col lg:flex-row">
-      {/* Brand panel */}
       <aside className="relative flex flex-1 flex-col justify-between overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 py-10 text-white lg:max-w-md lg:px-10">
         <div className="pointer-events-none absolute inset-0 opacity-40">
           <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-brand blur-3xl" />
@@ -137,7 +136,6 @@ export function AuthPage() {
         </ul>
       </aside>
 
-      {/* Form panel */}
       <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8">
         <div className="auth-glass w-full max-w-md rounded-2xl p-8 shadow-card">
           <div className="flex items-center justify-between gap-4">
@@ -151,8 +149,6 @@ export function AuthPage() {
             </div>
             <LogoMark className="h-11 w-11 lg:hidden" />
           </div>
-
-          {/* Mode tabs */}
           <div className="mt-8 flex rounded-xl bg-slate-100 p-1">
             <button
               type="button"

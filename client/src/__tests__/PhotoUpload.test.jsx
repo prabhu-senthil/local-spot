@@ -6,8 +6,6 @@ import axios from "axios";
 
 vi.mock("axios");
 
-// PhotoUpload calls apiClient.get("/upload/signature"), and apiClient is built
-// on top of axios. Mock apiClient so the interceptor setup doesn't blow up.
 vi.mock("../services/apiClient", () => ({
   default: {
     get: vi.fn(),
@@ -19,7 +17,6 @@ vi.mock("../services/apiClient", () => ({
   },
 }));
 
-// Mock lucide-react to avoid heavy SVG imports
 vi.mock("lucide-react", () => ({
   Camera: () => <div data-testid="camera-icon" />,
   X: () => <div data-testid="x-icon" />,
@@ -69,7 +66,6 @@ describe("PhotoUpload", () => {
   });
 
   it("should upload file successfully", async () => {
-    // apiClient.get is used internally for /upload/signature
     const apiClient = (await import("../services/apiClient")).default;
     apiClient.get.mockResolvedValue({
       data: {
@@ -80,7 +76,6 @@ describe("PhotoUpload", () => {
       },
     });
 
-    // axios.post is used for Cloudinary direct upload
     axios.post.mockResolvedValue({
       data: {
         secure_url: "https://example.com/image.jpg",

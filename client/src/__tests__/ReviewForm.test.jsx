@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ReviewForm from "../components/ReviewForm";
 import * as reviewApi from "../services/reviewApi";
-
-// Mock the API module
 vi.mock("../services/reviewApi", () => ({
   submitReview: vi.fn(),
 }));
@@ -23,7 +21,6 @@ describe("ReviewForm", () => {
     render(<ReviewForm venueId="123" />);
     const submitButton = screen.getByText("Submit Review");
     fireEvent.click(submitButton);
-
     await waitFor(() => {
       expect(screen.getByText("Please select a rating.")).toBeDefined();
     });
@@ -35,16 +32,10 @@ describe("ReviewForm", () => {
     reviewApi.submitReview.mockResolvedValue({ _id: "rev1", rating: 5 });
 
     render(<ReviewForm venueId="123" onReviewSubmitted={mockOnSubmit} />);
-    
-    // Select a rating (the 5th star)
     const stars = screen.getAllByRole("button").filter(b => b.querySelector("svg"));
     fireEvent.click(stars[4]);
-
-    // Fill review text
     const textarea = screen.getByPlaceholderText("What was it like?");
     fireEvent.change(textarea, { target: { value: "Amazing experience!" } });
-
-    // Submit
     const submitButton = screen.getByText("Submit Review");
     fireEvent.click(submitButton);
 
@@ -53,7 +44,7 @@ describe("ReviewForm", () => {
         venueId: "123",
         rating: 5,
         reviewText: "Amazing experience!",
-        crowdLevel: "moderate", // default
+        crowdLevel: "moderate",
         images: []
       });
       expect(mockOnSubmit).toHaveBeenCalledWith({ _id: "rev1", rating: 5 });

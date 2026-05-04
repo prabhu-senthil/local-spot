@@ -22,7 +22,6 @@ vi.mock("../services/reviewApi", () => ({
   voteOnReview: vi.fn(),
 }));
 
-// Mock child components to keep tests focused
 vi.mock("../components/ReviewForm", () => ({
   default: () => <div data-testid="mock-review-form">Review Form</div>,
 }));
@@ -31,7 +30,6 @@ vi.mock("../components/CrowdReportToggle", () => ({
   default: () => <div data-testid="mock-crowd-toggle">Crowd Toggle</div>,
 }));
 
-// Mock react-router hooks
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
@@ -89,16 +87,14 @@ describe("VenueDetails", () => {
   };
 
   it("should show loading state initially", () => {
-    // delay resolution to see loading state
     let resolvePromise;
     getVenueDetails.mockReturnValue(new Promise(resolve => {
       resolvePromise = resolve;
     }));
-    
+
     renderComponent();
     expect(screen.getByText("Loading venue details...")).toBeInTheDocument();
-    
-    // cleanup
+
     act(() => { resolvePromise(mockVenue); });
   });
 
@@ -128,8 +124,7 @@ describe("VenueDetails", () => {
       user: { id: "owner1", name: "Owner", role: "owner" },
       token: "valid-token",
     });
-    
-    // Venue is not claimed
+
     getVenueDetails.mockResolvedValue({ ...mockVenue, ownerId: null });
     claimVenue.mockResolvedValue({ venue: { ownerId: "owner1" } });
 
@@ -148,7 +143,6 @@ describe("VenueDetails", () => {
   });
 
   it("should allow voting on a review and handle enriched response", async () => {
-    // New API shape: { review, reviewer }
     voteOnReview.mockResolvedValue({
       review: { ...mockVenue.reviews[0], helpfulVotes: ["1"] },
       reviewer: { _id: "reviewer1", reviewerTrustScore: 3, status: "active" },
@@ -160,9 +154,8 @@ describe("VenueDetails", () => {
       expect(screen.getByText("Great place!")).toBeInTheDocument();
     });
 
-    // Find the Helpful vote button by its label text
     const helpfulBtn = await screen.findByRole("button", { name: /helpful/i });
-    
+
     act(() => {
       helpfulBtn.click();
     });
@@ -187,13 +180,12 @@ describe("VenueDetails", () => {
   });
 
   it("should NOT update review when voting on own review (403 self-vote)", async () => {
-    // Set up a review authored by the currently logged-in user
     const selfVenueData = {
       ...mockVenue,
       reviews: [
         {
           _id: "r1",
-          userId: { _id: "1", name: "Test User" }, // same id as logged-in user
+          userId: { _id: "1", name: "Test User" },
           rating: 5,
           reviewText: "My own review!",
           helpfulVotes: [],
@@ -203,7 +195,6 @@ describe("VenueDetails", () => {
     };
     getVenueDetails.mockResolvedValue(selfVenueData);
 
-    // Simulate server returning 403 for self-vote
     const selfVoteError = new Error("Forbidden");
     selfVoteError.response = { status: 403, data: { message: "You cannot vote on your own review." } };
     voteOnReview.mockRejectedValue(selfVoteError);
@@ -214,16 +205,12 @@ describe("VenueDetails", () => {
       expect(screen.getByText("My own review!")).toBeInTheDocument();
     });
 
-    // Attempt to click a vote button — if visible (component may hide for own reviews)
     const helpfulBtns = screen.queryAllByRole("button", { name: /helpful/i });
     if (helpfulBtns.length > 0) {
       act(() => helpfulBtns[0].click());
-      // The component should handle the 403 gracefully without crashing
       await waitFor(() => {
-        // Review text should still be visible (no crash / unmount)
         expect(screen.getByText("My own review!")).toBeInTheDocument();
       });
     }
-    // If no buttons are rendered (component hides them for own reviews), that's also valid
   });
 });

@@ -1,7 +1,4 @@
-/**
- * TrustBadge.test.jsx
- * Frontend unit tests for trust score badge + status pill in DashboardPage header.
- */
+
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -10,7 +7,6 @@ import { BrowserRouter } from "react-router-dom";
 import { DashboardPage } from "../pages/DashboardPage";
 import { useAuth } from "../contexts/AuthContext";
 
-// ── Mock dependencies ────────────────────────────────────────────────────────
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: vi.fn(),
 }));
@@ -29,7 +25,7 @@ vi.mock("mapbox-gl", () => ({
         flyTo: vi.fn(),
       };
     }),
-    NavigationControl: vi.fn(function () {}),
+    NavigationControl: vi.fn(function () { }),
     Marker: vi.fn(function () {
       return {
         setLngLat: vi.fn().mockReturnThis(),
@@ -44,7 +40,6 @@ vi.mock("mapbox-gl", () => ({
   },
 }));
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function renderDashboard() {
   return render(
@@ -68,8 +63,6 @@ function setupGeo() {
     json: async () => ({ features: [] }),
   }));
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("Trust Score Badge in DashboardPage header", () => {
   beforeEach(() => {

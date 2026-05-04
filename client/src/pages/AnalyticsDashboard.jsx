@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getOwnerDashboard } from "../services/analyticsApi";
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
 import { Store, Star, MessageSquare, Camera } from "lucide-react";
@@ -24,15 +24,14 @@ export default function AnalyticsDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeModal, setActiveModal] = useState(null); // 'venues' or 'reviews'
+  const [activeModal, setActiveModal] = useState(null);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
-  const [crowdView, setCrowdView] = useState(null); // unused — kept for safety
-  const [selectedDay, setSelectedDay] = useState(1); // 0=Sun…6=Sat, default Mon
+  const [crowdView, setCrowdView] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(1);
 
   const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon→Sun for tab display
+  const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-  // Filter the 168-point heatmap to the selected day's 24 hourly bars
   const crowdForDay = useMemo(() => {
     const hrs = Array.from({ length: 24 }, (_, h) => ({
       hour: `${String(h).padStart(2, "00")}:00`,
@@ -42,7 +41,7 @@ export default function AnalyticsDashboard() {
     (data?.crowdInsightMap || [])
       .filter(d => d.day === selectedDay)
       .forEach(({ hour, busyCount, quietCount }) => {
-        hrs[hour].busy  = Math.max(0, busyCount);   // guard against stale negatives
+        hrs[hour].busy = Math.max(0, busyCount);
         hrs[hour].quiet = Math.max(0, quietCount);
       });
     return hrs;
@@ -96,7 +95,6 @@ export default function AnalyticsDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
-      {/* Top Header - Aligned with Homepage */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white shadow-sm">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-90">
@@ -120,7 +118,7 @@ export default function AnalyticsDashboard() {
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
                 {initials}
               </div>
-              
+
               <Link
                 to="/dashboard"
                 className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
@@ -142,16 +140,16 @@ export default function AnalyticsDashboard() {
       {user?.role === "owner" && data?.restaurantInfo ? (
         <div className="relative h-64 md:h-80 w-full bg-brand overflow-hidden shrink-0">
           {heroImage ? (
-            <img 
-              src={heroImage} 
-              alt={data.restaurantInfo.name} 
+            <img
+              src={heroImage}
+              alt={data.restaurantInfo.name}
               className="absolute inset-0 w-full h-full object-cover opacity-80"
             />
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-brand to-brand-dark" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent" />
-          
+
           <div className="absolute bottom-0 left-0 w-full p-6 md:p-10 z-10 flex justify-between items-end">
             <div className="max-w-7xl mx-auto flex flex-col gap-2 w-full">
               <span className="inline-block px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-semibold uppercase tracking-wider w-fit">
@@ -161,7 +159,7 @@ export default function AnalyticsDashboard() {
 
             </div>
             {user?.role === "owner" && data?.allVenues?.[0]?._id && (
-              <button 
+              <button
                 onClick={() => setShowPhotoUpload(true)}
                 className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-lg transition shrink-0"
               >
@@ -183,7 +181,7 @@ export default function AnalyticsDashboard() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8">
         {/* STATS ROW */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-2">
-          <div 
+          <div
             className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:shadow-md transition"
             onClick={() => setActiveModal("venues")}
           >
@@ -195,7 +193,7 @@ export default function AnalyticsDashboard() {
               <p className="text-2xl font-bold text-slate-800">{data?.overview?.totalVenues || 0}</p>
             </div>
           </div>
-          
+
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
               <Star className="w-6 h-6" />
@@ -206,7 +204,7 @@ export default function AnalyticsDashboard() {
             </div>
           </div>
 
-          <div 
+          <div
             className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:shadow-md transition"
             onClick={() => setActiveModal("reviews")}
           >
@@ -221,21 +219,18 @@ export default function AnalyticsDashboard() {
         </div>
 
         <div className="flex flex-col gap-8">
-          {/* CROWD ACTIVITY BAR CHART — X: Hours, Y: Busy count, filtered by day */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
             <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-lg font-bold text-slate-800">Crowd Activity</h2>
-              {/* Day-of-week selector tabs */}
               <div className="flex items-center gap-1 flex-wrap">
                 {DAY_ORDER.map(dayIdx => (
                   <button
                     key={dayIdx}
                     onClick={() => setSelectedDay(dayIdx)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                      selectedDay === dayIdx
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${selectedDay === dayIdx
                         ? "bg-orange-500 text-white shadow-sm"
                         : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                    }`}
+                      }`}
                   >
                     {DAY_NAMES[dayIdx]}
                   </button>
@@ -260,7 +255,7 @@ export default function AnalyticsDashboard() {
                     iconType="circle"
                     iconSize={8}
                   />
-                  <Bar dataKey="busy"  name="busy"  fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="busy" name="busy" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={36} />
                   <Bar dataKey="quiet" name="quiet" fill="#3b82f6" radius={[3, 3, 0, 0]} maxBarSize={36} />
                 </BarChart>
               </ResponsiveContainer>
@@ -269,7 +264,6 @@ export default function AnalyticsDashboard() {
         </div>
       </main>
 
-      {/* MODALS */}
       {activeModal === "venues" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-fade-in-up">
@@ -347,7 +341,7 @@ export default function AnalyticsDashboard() {
               <p className="text-sm text-slate-500 mb-4">
                 Upload a high-quality image to represent {data.restaurantInfo.name}. This will be shown on your venue details page.
               </p>
-              <PhotoUpload 
+              <PhotoUpload
                 maxPhotos={1}
                 onUploadComplete={async (urls) => {
                   if (urls.length > 0) {
@@ -356,7 +350,6 @@ export default function AnalyticsDashboard() {
                         `/venues/${data.allVenues[0]._id}/image`,
                         { imageUrl: urls[0] }
                       );
-                      // Update local state to reflect new image immediately
                       setData(prev => ({
                         ...prev,
                         restaurantInfo: { ...prev.restaurantInfo, image: urls[0] }
@@ -367,7 +360,7 @@ export default function AnalyticsDashboard() {
                       alert("Image uploaded, but failed to save to venue.");
                     }
                   }
-                }} 
+                }}
               />
             </div>
           </div>

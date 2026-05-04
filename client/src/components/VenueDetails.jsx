@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, MapPin, Star, Clock, AlertCircle, 
+import {
+  ArrowLeft, MapPin, Star, Clock, AlertCircle,
   Users, Activity, ShieldCheck, CheckCircle2,
   ThumbsUp, ThumbsDown
 } from "lucide-react";
@@ -24,7 +24,6 @@ export default function VenueDetails() {
   const [venue, setVenue] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // Map of reviewerId → { reviewerTrustScore, status } for optimistic UI updates
   const [reviewerTrustMap, setReviewerTrustMap] = useState({});
   const [claiming, setClaiming] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
@@ -103,21 +102,16 @@ export default function VenueDetails() {
     }
     try {
       const result = await voteOnReview(reviewId, voteType);
-      // API now returns { review, reviewer } — handle both old and new shape
       const updatedReview = result.review || result;
       const reviewerData = result.reviewer || null;
 
       console.log(">>> VOTE SUCCESS, updated review:", updatedReview);
-
-      // Update the review in the venue state
       setVenue((prev) => ({
         ...prev,
         reviews: prev.reviews.map((r) =>
           String(r._id) === String(reviewId) ? updatedReview : r
         ),
       }));
-
-      // Update the reviewer trust map for optimistic UI
       if (reviewerData?._id) {
         setReviewerTrustMap((prev) => ({
           ...prev,
@@ -127,9 +121,6 @@ export default function VenueDetails() {
           },
         }));
       }
-
-      // Refresh the current user's own trust data (they voted, which may affect
-      // the reviewer they voted on — and their own status stays current)
       refreshUser();
     } catch (err) {
       if (err?.response?.status === 409) {
@@ -145,10 +136,6 @@ export default function VenueDetails() {
       try {
         const data = await getVenueDetails(id);
         setVenue(data);
-
-        // Seed reviewerTrustMap from freshly populated userId on each review.
-        // This ensures we show the current trust score from the DB on first load,
-        // not a stale value stored on the Review document itself.
         if (Array.isArray(data.reviews)) {
           const initialTrustMap = {};
           for (const review of data.reviews) {
@@ -199,7 +186,7 @@ export default function VenueDetails() {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-slate-800 mb-2">Oops!</h2>
           <p className="text-slate-600 mb-6">{error || "We couldn't find that venue."}</p>
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="btn-primary w-full flex justify-center items-center gap-2"
           >
@@ -215,8 +202,6 @@ export default function VenueDetails() {
   if (venue.images?.length > 0) {
     heroImage = venue.images[0];
   } else if (venue.category) {
-    // Unsplash source is deprecated, so we use a reliable generic cafe/restaurant image as a fallback
-    // In a real app, you would integrate Unsplash API to search by category
     heroImage = venue.category.toLowerCase().includes("coffee") || venue.category.toLowerCase().includes("cafe")
       ? "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&q=80&w=1200"
       : "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1200";
@@ -224,22 +209,20 @@ export default function VenueDetails() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Hero Section */}
       <div className="relative h-72 md:h-96 w-full bg-brand overflow-hidden">
         {heroImage ? (
-          <img 
-            src={heroImage} 
-            alt={venue.name} 
+          <img
+            src={heroImage}
+            alt={venue.name}
             className="absolute inset-0 w-full h-full object-cover opacity-80"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-brand to-brand-dark" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent" />
-        
-        {/* Top Nav */}
+
         <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="flex items-center justify-center w-10 h-10 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition shadow-sm"
           >
@@ -247,7 +230,6 @@ export default function VenueDetails() {
           </button>
         </div>
 
-        {/* Hero Content */}
         <div className="absolute bottom-0 left-0 w-full p-6 md:p-10 z-10">
           <div className="max-w-5xl mx-auto flex flex-col gap-2">
             <span className="inline-block px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-semibold uppercase tracking-wider w-fit">
@@ -263,13 +245,10 @@ export default function VenueDetails() {
       </div>
 
       <div className="max-w-5xl mx-auto px-6 -mt-6 relative z-20">
-        
-        {/* Quick Stats Bar */}
-
         {user?.role === "owner" && !venue.ownerId && (
           <div className="mt-6">
             {!showOTP ? (
-              <button 
+              <button
                 onClick={handleClaimRequest}
                 disabled={claiming}
                 className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-bold text-white transition hover:bg-green-700 disabled:opacity-50"
@@ -289,15 +268,15 @@ export default function VenueDetails() {
                   <p>OTP expires in: <span className="font-semibold">{formatSeconds(otpExpiresIn)}</span></p>
                   <p>Resend available in: <span className="font-semibold">{formatSeconds(resendAvailableIn)}</span></p>
                 </div>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   maxLength={6}
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
                   placeholder="000000"
                   className="input-field text-center text-xl tracking-widest font-mono"
                 />
-                <button 
+                <button
                   onClick={handleVerifyOTP}
                   disabled={verifying || otp.trim().length !== 6 || otpExpiresIn <= 0}
                   className="btn-primary w-full"
@@ -315,7 +294,7 @@ export default function VenueDetails() {
                       ? `Resend OTP in ${formatSeconds(resendAvailableIn)}`
                       : "Resend OTP"}
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     setShowOTP(false);
                     setOtp("");
@@ -331,11 +310,7 @@ export default function VenueDetails() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
-          
-          {/* Main Content (Left Column) */}
           <div className="md:col-span-2 space-y-8">
-            
-            {/* Tags */}
             {venue.tags && venue.tags.length > 0 && (
               <section>
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Vibes & Amenities</h3>
@@ -349,7 +324,6 @@ export default function VenueDetails() {
               </section>
             )}
 
-            {/* Reviews */}
             <section>
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-slate-800">Reviews</h3>
@@ -368,32 +342,29 @@ export default function VenueDetails() {
                           <div className="flex items-center gap-2 mt-0.5">
                             <div className="flex items-center gap-0.5">
                               {[...Array(5)].map((_, i) => (
-                                <Star 
-                                  key={i} 
-                                  className={`w-3.5 h-3.5 ${i < r.rating ? "text-orange-400 fill-current" : "text-slate-200"}`} 
+                                <Star
+                                  key={i}
+                                  className={`w-3.5 h-3.5 ${i < r.rating ? "text-orange-400 fill-current" : "text-slate-200"}`}
                                 />
                               ))}
                             </div>
                             <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Verified Visit</span>
                           </div>
                         </div>
-                        {/* Reviewer trust badge — shows optimistically updated score */}
                         {(() => {
                           const reviewerIdStr = String(r.userId?._id || r.userId || "");
                           const trustData = reviewerTrustMap[reviewerIdStr];
                           if (!reviewerIdStr) return null;
-                          // Priority: optimistic map (post-vote) → populated userId field (fresh from DB) → null (hide badge)
                           const score = trustData?.reviewerTrustScore ?? r.userId?.reviewerTrustScore ?? null;
                           const status = trustData?.status ?? r.userId?.status ?? "active";
                           if (score === null) return null;
                           return (
                             <div className="flex flex-col items-end gap-1">
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  score >= 0
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${score >= 0
                                     ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
                                     : "bg-red-50 text-red-700 ring-1 ring-red-200"
-                                }`}
+                                  }`}
                                 title="Reviewer trust score"
                               >
                                 ⭐ {score >= 0 ? "+" : ""}{score}
@@ -407,7 +378,6 @@ export default function VenueDetails() {
                           );
                         })()}
                       </div>
-                      {/* ── Three-tier AI Classification Badge ── */}
                       {(() => {
                         const cls = r.suspicionClassification || (r.isSuspicious ? "suspicious" : "genuine");
                         const score = r.suspicionScore ?? r.mlScore;
@@ -459,7 +429,6 @@ export default function VenueDetails() {
                           );
                         }
 
-                        // Genuine — show subtle grey AI score only
                         return pct !== null ? (
                           <div className="flex items-center gap-2 mb-3">
                             <div
@@ -475,42 +444,40 @@ export default function VenueDetails() {
 
 
                       <p className="text-slate-600 text-sm leading-relaxed mb-3">{r.reviewText || "No comment provided."}</p>
-                      
+
                       {r.images && r.images.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2 mb-3">
                           {r.images.map((imgUrl, i) => (
-                            <img 
-                              key={i} 
-                              src={imgUrl} 
-                              alt={`Review photo ${i + 1}`} 
+                            <img
+                              key={i}
+                              src={imgUrl}
+                              alt={`Review photo ${i + 1}`}
                               className="w-20 h-20 md:w-24 md:h-24 object-cover rounded-lg border border-slate-200"
                             />
                           ))}
                         </div>
                       )}
 
-                      {/* Upvote / Downvote / Helpful / Suspicious */}
+
                       <div className="flex items-center gap-3 mt-2">
-                        <button 
+                        <button
                           onClick={() => handleVote(r._id, 'helpful')}
-                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition border ${
-                            user && (r.helpfulVotes?.includes(user.id) || r.helpfulVotes?.includes(user._id))
-                              ? 'bg-green-50 text-green-600 border-green-200' 
+                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition border ${user && (r.helpfulVotes?.includes(user.id) || r.helpfulVotes?.includes(user._id))
+                              ? 'bg-green-50 text-green-600 border-green-200'
                               : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                          }`}
+                            }`}
                           disabled={!user}
                         >
                           <ThumbsUp className="w-3.5 h-3.5" />
                           <span>Helpful ({r.helpfulVotes?.length || 0})</span>
                         </button>
-                        
-                        <button 
+
+                        <button
                           onClick={() => handleVote(r._id, 'suspicious')}
-                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition border ${
-                            user && (r.suspiciousVotes?.includes(user.id) || r.suspiciousVotes?.includes(user._id))
-                              ? 'bg-red-50 text-red-600 border-red-200' 
+                          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md transition border ${user && (r.suspiciousVotes?.includes(user.id) || r.suspiciousVotes?.includes(user._id))
+                              ? 'bg-red-50 text-red-600 border-red-200'
                               : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
-                          }`}
+                            }`}
                           title="Report as potentially suspicious"
                           disabled={!user}
                         >
@@ -534,8 +501,8 @@ export default function VenueDetails() {
                     <p>{user.role === "owner" ? "Restaurant owners" : "Administrators"} cannot submit reviews.</p>
                   </div>
                 ) : (
-                  <ReviewForm 
-                    venueId={venue._id} 
+                  <ReviewForm
+                    venueId={venue._id}
                     onReviewSubmitted={(newReview) => {
                       setVenue(prev => {
                         const oldTotal = prev.reviewCount || 0;
@@ -562,10 +529,7 @@ export default function VenueDetails() {
             </section>
           </div>
 
-          {/* Sidebar (Right Column) */}
           <div className="space-y-8">
-            
-            {/* Rating Summary (Moved from top) */}
             <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
               <div className="flex items-center gap-4">
                 <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-orange-50 text-orange-500">
@@ -582,7 +546,6 @@ export default function VenueDetails() {
               </div>
             </section>
 
-            {/* Crowd Insights */}
             <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
               <div className="flex items-center gap-2 mb-6">
                 <Activity className="w-5 h-5 text-brand" />
@@ -601,8 +564,8 @@ export default function VenueDetails() {
                 </div>
 
                 <div className="w-full bg-slate-100 rounded-full h-2">
-                  <div 
-                    className="bg-red-400 h-2 rounded-full" 
+                  <div
+                    className="bg-red-400 h-2 rounded-full"
                     style={{ width: `${Math.min(100, (venue.crowd?.busy || 0) * 10)}%` }}
                   ></div>
                 </div>
@@ -618,16 +581,16 @@ export default function VenueDetails() {
                 </div>
 
                 <div className="w-full bg-slate-100 rounded-full h-2">
-                  <div 
-                    className="bg-blue-400 h-2 rounded-full" 
+                  <div
+                    className="bg-blue-400 h-2 rounded-full"
                     style={{ width: `${Math.min(100, (venue.crowd?.quiet || 0) * 10)}%` }}
                   ></div>
                 </div>
               </div>
 
               {user && user.role !== "owner" && user.role !== "admin" ? (
-                <CrowdReportToggle 
-                  venueId={venue._id} 
+                <CrowdReportToggle
+                  venueId={venue._id}
                   onReportSubmitted={(status) => {
                     setVenue((prev) => ({
                       ...prev,
