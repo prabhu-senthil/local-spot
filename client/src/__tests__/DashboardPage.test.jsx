@@ -5,20 +5,13 @@ import { BrowserRouter } from "react-router-dom";
 import { DashboardPage } from "../pages/DashboardPage";
 import { useAuth } from "../contexts/AuthContext";
 
-// ── Mock Auth Context ─────────────────────────────────────────────────────────
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: vi.fn(),
 }));
-
-// ── Mock geoapify (venue search) ──────────────────────────────────────────────
-// DashboardPage calls searchNearbyVenues from geoapify.js, not apiClient.
-// We mock the whole module so tests control exactly what venues are returned.
 vi.mock("../services/geoapify", () => ({
   searchNearbyVenues: vi.fn(),
   searchRestaurants: vi.fn(),
 }));
-
-// ── Mock apiClient (needed by other imports; prevents interceptors crash) ─────
 vi.mock("../services/apiClient", () => ({
   default: {
     get: vi.fn(),
@@ -30,7 +23,6 @@ vi.mock("../services/apiClient", () => ({
   },
 }));
 
-// ── Mock mapbox-gl ────────────────────────────────────────────────────────────
 vi.mock("mapbox-gl", () => ({
   default: {
     Map: vi.fn(function () {
@@ -41,7 +33,7 @@ vi.mock("mapbox-gl", () => ({
         flyTo: vi.fn(),
       };
     }),
-    NavigationControl: vi.fn(function () {}),
+    NavigationControl: vi.fn(function () { }),
     Marker: vi.fn(function () {
       return {
         setLngLat: vi.fn().mockReturnThis(),
@@ -58,8 +50,6 @@ vi.mock("mapbox-gl", () => ({
   },
 }));
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 const mockUser = {
   id: "1",
   name: "Test User",
@@ -75,14 +65,12 @@ describe("DashboardPage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Default auth mock
     useAuth.mockReturnValue({
       user: mockUser,
       logout: mockLogout,
       refreshUser: vi.fn(),
     });
 
-    // Default geolocation mock — resolves immediately
     Object.defineProperty(global.navigator, "geolocation", {
       value: {
         getCurrentPosition: vi.fn().mockImplementation((success) =>
@@ -92,7 +80,6 @@ describe("DashboardPage", () => {
       configurable: true,
     });
 
-    // Default global fetch — handles reverse geocode (Mapbox) and any fallback
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation(async (url) => {
@@ -108,7 +95,6 @@ describe("DashboardPage", () => {
       })
     );
 
-    // Default searchNearbyVenues — empty list (overridden per test)
     const { searchNearbyVenues } = await import("../services/geoapify");
     searchNearbyVenues.mockResolvedValue([]);
   });
@@ -119,8 +105,6 @@ describe("DashboardPage", () => {
         <DashboardPage />
       </BrowserRouter>
     );
-
-  // ── Tests ──────────────────────────────────────────────────────────────────
 
   it("should render header with user info", async () => {
     renderDashboard();
@@ -134,7 +118,6 @@ describe("DashboardPage", () => {
   it("should fetch and display venues based on geolocation", async () => {
     const { searchNearbyVenues } = await import("../services/geoapify");
 
-    // Provide test venues via the geoapify mock
     searchNearbyVenues.mockResolvedValue([
       {
         _id: "venue1",

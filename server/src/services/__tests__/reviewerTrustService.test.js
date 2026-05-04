@@ -17,6 +17,7 @@ vi.mock("../../models/Review.js", () => ({
 vi.mock("../../models/User.js", () => ({
   default: {
     findByIdAndUpdate: vi.fn(),
+    findById: vi.fn(),
   },
 }));
 

@@ -12,16 +12,15 @@ function buildVenuesUrl({ lat, lng, query, category, radius, limit }) {
 }
 
 /**
- * Nearby place search via your Express API (Geoapify key stays on the server).
  * @param {object} params
  * @param {number} params.lat
  * @param {number} params.lng
- * @param {string} [params.query] - Sent to Geoapify Places as `name` / name filter (e.g. pizza, ramen).
- * @param {string} [params.category] - One of: restaurants, nightlife, shopping, services, coffee, outdoors.
+ * @param {string} [params.query] 
+ * @param {string} [params.category] 
  * @param {number} [params.radius]
  * @param {number} [params.limit]
  * @param {AbortSignal} [params.signal]
- * @returns {Promise<Array>} Normalized venue objects from the backend.
+ * @returns {Promise<Array>}
  */
 export async function searchNearbyVenues({
   lat,
@@ -43,5 +42,4 @@ export async function searchNearbyVenues({
   return Array.isArray(data) ? data : [];
 }
 
-/** @deprecated Use {@link searchNearbyVenues}; do not call Geoapify from the browser. */
 export const searchRestaurants = searchNearbyVenues;

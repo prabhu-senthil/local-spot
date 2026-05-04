@@ -8,8 +8,7 @@ import { generateOTP, hashOTP, verifyOTP, sendOTPEmail } from "../services/otpSe
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v2/places";
 const OTP_VALIDITY_MS = 120 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 30 * 1000;
- 
-/** Dashboard category ids → Geoapify Places categories (comma-separated). */
+  
 const CATEGORY_TO_GEOAPIFY = {
   restaurants: "catering.restaurant,catering.fast_food",
   nightlife: "catering.bar,entertainment.nightclub",
@@ -52,7 +51,6 @@ function resolveCategories(req) {
       : null;
   if (slug && CATEGORY_TO_GEOAPIFY[slug]) return CATEGORY_TO_GEOAPIFY[slug];
 
-  /** Legacy: Foursquare-style category ids from an older client. */
   const fsq = typeof req.query.categoryId === "string" ? req.query.categoryId.trim() : "";
   const fsqMap = {
     "13065": CATEGORY_TO_GEOAPIFY.restaurants,
@@ -67,7 +65,7 @@ function resolveCategories(req) {
   return CATEGORY_TO_GEOAPIFY.restaurants;
 }
 
-// Map Geoapify response → your app format
+ 
 function mapVenue(v) {
   return {
     id: v.properties.place_id,
@@ -81,12 +79,11 @@ function mapVenue(v) {
       typeof v.properties.distance === "number" && v.properties.distance > 0
         ? `${(v.properties.distance / 1000).toFixed(1)} km`
         : "",
-    rating: null, // Geoapify doesn't provide ratings
+    rating: null,
     price: "",
   };
 }
-
-// GET nearby venues
+ 
 export async function getVenues(req, res, next) {
   try {
     const apiKey = getGeoapifyApiKey();
@@ -109,24 +106,24 @@ export async function getVenues(req, res, next) {
 
     const url = new URL(GEOAPIFY_BASE_URL);
 
-    // circle filter (lon, lat, radiusMeters)
+ 
     url.searchParams.set("filter", `circle:${lng},${lat},${radius}`);
     url.searchParams.set("categories", resolveCategories(req));
     url.searchParams.set("bias", `proximity:${lng},${lat}`);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("apiKey", apiKey);
 
-    // Geoapify: optional "name" narrows to places matching the name (e.g. pizza, Starbucks).
+ 
     if (nameFilter) url.searchParams.set("name", nameFilter);
 
-    // Parallelize External API and Local DB Fetch
+ 
     const [response, localVenuesInArea] = await Promise.all([
       fetch(url),
       Venue.find({
         location: {
           $near: {
             $geometry: { type: "Point", coordinates: [lng, lat] },
-            $maxDistance: radius + 100 // buffer for safety
+            $maxDistance: radius + 100
           }
         }
       }).lean()
@@ -146,14 +143,14 @@ export async function getVenues(req, res, next) {
     for (const feature of geoResults) {
       const mapped = mapVenue(feature);
 
-      // Try to find a match in the locally fetched array first
+ 
       let existing = localVenuesInArea.find(lv => 
         lv.name === mapped.name && 
         lv.location.coordinates[0] === mapped.longitude &&
         lv.location.coordinates[1] === mapped.latitude
       );
 
-      // Fallback: If not found in precise match, check for near match (very rare now)
+ 
       if (!existing) {
         existing = await Venue.findOne({
           name: mapped.name,
@@ -163,7 +160,7 @@ export async function getVenues(req, res, next) {
                 type: "Point",
                 coordinates: [mapped.longitude, mapped.latitude],
               },
-              $maxDistance: 10, // meters
+              $maxDistance: 10, 
             },
           },
         });
@@ -194,7 +191,7 @@ export async function getVenues(req, res, next) {
       });
     }
 
-    // Sort by rating if Top Picks
+ 
     if (req.query.category === "top_picks") {
       venues.sort((a, b) => b.avgRating - a.avgRating);
     }
@@ -205,16 +202,7 @@ export async function getVenues(req, res, next) {
   }
 }
 
-// GET single venue 
-/* export async function getVenueById(req, res, next) {
-  try {
-    return res.status(501).json({
-      message: "Geoapify does not support fetching a single venue by ID.",
-    });
-  } catch (err) {
-    return next(err);
-  }
-} */
+ 
 
 export const getVenueById = async (req, res, next) => {
   try {
@@ -226,16 +214,16 @@ export const getVenueById = async (req, res, next) => {
       });
     }
 
-    // Fetch associated reviews
+ 
     const reviews = await Review.find({ venueId: venue._id })
       .populate("userId", "name reviewerTrustScore status")
       .sort({ createdAt: -1 })
       .lean();
 
-    // Fetch associated crowd reports
+ 
     const crowdReports = await CrowdReport.find({ venueId: venue._id }).lean();
     
-    // Calculate crowd stats
+ 
     let busyCount = 0;
     let quietCount = 0;
     
@@ -244,8 +232,7 @@ export const getVenueById = async (req, res, next) => {
       if (report.status === "quiet") quietCount++;
     }
 
-
-    // Assemble the complete response object for the frontend
+ 
     const responseData = {
       ...venue,
       reviews: reviews,
@@ -273,12 +260,12 @@ export const claimVenue = async (req, res, next) => {
       return res.status(403).json({ message: "This venue has already been claimed." });
     }
     
-    // Only Owners need OTP
+ 
     if (req.user.role !== "owner") {
       return res.status(403).json({ message: "Only users with the Owner role can claim restaurants." });
     }
 
-    // Check if the user already owns a venue
+ 
     const existingVenue = await Venue.findOne({ ownerId: req.user.id });
     if (existingVenue) {
       return res.status(403).json({ message: "You can only claim one restaurant." });
@@ -289,7 +276,7 @@ export const claimVenue = async (req, res, next) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    // If an OTP is already active for the same venue, ask frontend to wait or verify.
+ 
     if (user.otpHash && user.otpExpires && user.otpTargetVenueId?.toString() === venueId) {
       const now = Date.now();
       const expiresInMs = new Date(user.otpExpires).getTime() - now;
@@ -307,11 +294,11 @@ export const claimVenue = async (req, res, next) => {
       }
     }
 
-    // Generate and send OTP from backend
+ 
     const otp = generateOTP();
     const otpHash = await hashOTP(otp);
     const now = new Date();
-    const otpExpires = new Date(now.getTime() + OTP_VALIDITY_MS); // 120 seconds
+    const otpExpires = new Date(now.getTime() + OTP_VALIDITY_MS);
 
     user.otpHash = otpHash;
     user.otpExpires = otpExpires;
@@ -401,12 +388,12 @@ export const verifyClaimOTP = async (req, res, next) => {
       return res.status(400).json({ message: "OTP does not match this venue claim request." });
     }
 
-    // Check expiry
+ 
     if (user.otpExpires < new Date()) {
       return res.status(400).json({ message: "OTP has expired. Please request a new one." });
     }
 
-    // Verify OTP
+ 
     const isValid = await verifyOTP(otp, user.otpHash);
     if (!isValid) {
       return res.status(400).json({ message: "Invalid OTP." });
@@ -418,13 +405,9 @@ export const verifyClaimOTP = async (req, res, next) => {
     }
     if (venue.ownerId) {
       return res.status(403).json({ message: "This venue has already been claimed." });
-    }
-
-    // Grant ownership
+    } 
     venue.ownerId = user._id;
-    await venue.save();
-
-    // Clear OTP data
+    await venue.save(); 
     user.otpHash = undefined;
     user.otpExpires = undefined;
     user.otpRequestedAt = undefined;
@@ -447,19 +430,13 @@ export const updateVenueImage = async (req, res, next) => {
     const venue = await Venue.findById(req.params.id);
     if (!venue) {
       return res.status(404).json({ message: "Venue not found" });
-    }
-
-    // Verify ownership
+    } 
     if (venue.ownerId?.toString() !== req.user.id) {
       return res.status(403).json({ message: "You don't have permission to update this venue." });
-    }
-
-    // Since we're using Cloudinary, we just need to replace the first image in the array
+    } 
     if (!venue.images) {
       venue.images = [];
-    }
-    
-    // Set as the primary image (index 0)
+    } 
     venue.images[0] = imageUrl;
     await venue.save();
 

@@ -1,8 +1,3 @@
-/**
- * reviews.integration.test.js
- * Integration tests for review creation, voting, trust, dedup, and blocking.
- * All mocks are at top-level to satisfy vitest hoisting requirements.
- */
 
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import request from "supertest";
@@ -10,8 +5,6 @@ import express from "express";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import reviewRoutes from "../routes/reviews.routes.js";
-
-// ── ALL vi.mock calls must be at top level (hoisted before imports) ───────────
 
 vi.mock("../models/Review.js", () => ({
   default: {
@@ -59,14 +52,14 @@ vi.mock("../models/User.js", () => ({
       select: vi.fn().mockImplementation(() => ({
         lean: vi.fn().mockResolvedValue({
           _id: id,
-          id: String(id),   // mirror Mongoose .id virtual
+          id: String(id),
           role: "user",
           status: "active",
           reviewerTrustScore: 0,
         }),
         then: undefined,
         _id: id,
-        id: String(id),     // mirror Mongoose .id virtual
+        id: String(id),
         role: "user",
         status: "active",
         reviewerTrustScore: 0,
@@ -103,8 +96,6 @@ vi.mock("../services/fakeReviewDetectionService.js", () => ({
   }),
 }));
 
-// ── App setup ─────────────────────────────────────────────────────────────────
-
 const app = express();
 app.use(express.json());
 app.use("/api/reviews", reviewRoutes);
@@ -113,8 +104,6 @@ if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = "fallback_secret";
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
 describe("Reviews Integration", () => {
   const activeUserId = new mongoose.Types.ObjectId().toString();
   const activeUserToken = jwt.sign(
@@ -122,8 +111,6 @@ describe("Reviews Integration", () => {
     process.env.JWT_SECRET,
     { expiresIn: "1h" }
   );
-
-  // ── Auth Tests ─────────────────────────────────────────────────────────────
 
   it("should reject unauthenticated review submissions (401)", async () => {
     const res = await request(app).post("/api/reviews").send({
@@ -162,8 +149,6 @@ describe("Reviews Integration", () => {
     expect(res.body).toHaveProperty("_id", "123");
   });
 
-  // ── Blocked User Test ──────────────────────────────────────────────────────
-
   it("should reject review submission from a blocked user (403)", async () => {
     const blockedUserId = new mongoose.Types.ObjectId().toString();
     const blockedToken = jwt.sign(
@@ -196,8 +181,6 @@ describe("Reviews Integration", () => {
     expect(res.body.message).toMatch(/blocked/i);
   });
 
-  // ── Vote Duplicate Prevention Tests ───────────────────────────────────────
-
   it("should return 409 when voting the same type twice", async () => {
     const ReviewVote = (await import("../models/ReviewVote.js")).default;
     ReviewVote.findOne.mockResolvedValueOnce({ type: "helpful", save: vi.fn() });
@@ -215,7 +198,7 @@ describe("Reviews Integration", () => {
     const res = await request(app)
       .post(`/api/reviews/fixed-review-id/vote`)
       .set("Authorization", `Bearer ${activeUserToken}`)
-      .send({ voteType: "upvote" }); // invalid — must be helpful|suspicious
+      .send({ voteType: "upvote" });
 
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/voteType/i);
@@ -233,7 +216,6 @@ describe("Reviews Integration", () => {
       .set("Authorization", `Bearer ${activeUserToken}`)
       .send({ voteType: "suspicious" });
 
-    // 200 if review mock matches; 404 if id mismatch; 500 if async trust errored (acceptable in test env)
     expect([200, 404, 500]).toContain(res.status);
   });
 
@@ -249,15 +231,11 @@ describe("Reviews Integration", () => {
     expect([200, 404, 500]).toContain(res.status);
   });
 
-  // ── Self-vote prevention ───────────────────────────────────────────────────
-
   it("should reject a vote on the reviewer's own review (403)", async () => {
     const Review = (await import("../models/Review.js")).default;
-
-    // Make the review's userId match the voter's userId
     Review.findById.mockResolvedValueOnce({
       _id: "fixed-review-id",
-      userId: activeUserId, // same as the token's user id
+      userId: activeUserId,
       helpfulVotes: { pull: vi.fn(), push: vi.fn() },
       suspiciousVotes: { pull: vi.fn(), push: vi.fn() },
       save: vi.fn().mockResolvedValue(true),
@@ -271,8 +249,6 @@ describe("Reviews Integration", () => {
     expect(res.status).toBe(403);
     expect(res.body.message).toMatch(/cannot vote on your own review/i);
   });
-
-  // ── Fake Review Detection Tests ────────────────────────────────────────────
 
   it("should flag a gibberish review as highly_suspicious (201 + classification)", async () => {
     const { detectFakeReview } = await import("../services/fakeReviewDetectionService.js");

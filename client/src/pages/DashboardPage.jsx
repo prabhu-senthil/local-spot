@@ -553,6 +553,7 @@ export function DashboardPage() {
                             </h2>
                             <p className="text-sm text-slate-600">{v.category}</p>
                             {v.address && <p className="mt-1 text-xs text-slate-500">{v.address}</p>}
+                            {v.distanceText && <p className="mt-1 text-xs text-slate-500">{v.distanceText}</p>}
                           </div>
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">

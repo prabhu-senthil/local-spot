@@ -2,14 +2,14 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import * as adminApi from "../services/adminApi";
-import { 
-  Users, MessageSquare, MapPin, Activity, 
-  Shield, ShieldAlert, Trash2, CheckCircle, 
+import {
+  Users, MessageSquare, MapPin, Activity,
+  Shield, ShieldAlert, Trash2, CheckCircle,
   XCircle, Filter, RotateCcw, GitMerge,
   Search, ExternalLink, MoreVertical, PieChart as PieIcon, BarChart as BarIcon, TrendingUp
 } from "lucide-react";
-import { 
-  PieChart, Pie, Cell, ResponsiveContainer, 
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
   AreaChart, Area
 } from "recharts";
@@ -51,7 +51,7 @@ export default function AdminDashboard() {
       else if (activeTab === "venues") {
         res = await adminApi.getAllAdminVenues({ sort: venueSort });
       }
-      
+
       setData(res.data.reviews || res.data);
     } catch (err) {
       setError("Failed to fetch data for " + activeTab);
@@ -105,7 +105,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white px-6 py-4 shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-4">
@@ -125,7 +124,6 @@ export default function AdminDashboard() {
       </header>
 
       <div className="mx-auto w-full max-w-7xl flex-1 flex flex-col p-6">
-        {/* Alerts */}
         {success && (
           <div className="mb-6 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             <div className="flex items-center gap-2"><CheckCircle size={16} /> {success}</div>
@@ -139,7 +137,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Tab Navigation */}
         <div className="mb-8 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
           {tabs.map((t) => {
             const Icon = t.icon;
@@ -147,11 +144,10 @@ export default function AdminDashboard() {
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all rounded-t-xl ${
-                  activeTab === t.id
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all rounded-t-xl ${activeTab === t.id
                     ? "bg-white border-x border-t border-slate-200 text-slate-900 -mb-[9px] relative z-10"
                     : "text-slate-500 hover:text-slate-700"
-                }`}
+                  }`}
               >
                 <Icon size={18} />
                 {t.label}
@@ -160,9 +156,9 @@ export default function AdminDashboard() {
           })}
         </div>
 
-        {/* Main Content Area */}
+
         <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          {/* Action Bar */}
+
           <div className="p-4 border-b border-slate-100 flex items-center justify-end bg-slate-50/50">
             <button onClick={fetchData} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition uppercase tracking-wider">
               <RotateCcw size={14} /> Refresh Data
@@ -173,8 +169,8 @@ export default function AdminDashboard() {
             <div className="p-4 border-b border-slate-100 flex gap-4 items-center bg-white">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sort By:</span>
-                <select 
-                  value={venueSort} 
+                <select
+                  value={venueSort}
                   onChange={(e) => setVenueSort(e.target.value)}
                   className="rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-3 text-xs font-bold text-slate-700 focus:border-brand focus:outline-none"
                 >
@@ -196,7 +192,6 @@ export default function AdminDashboard() {
               <div className="min-w-full divide-y divide-slate-100">
                 {activeTab === "stats" && stats && (
                   <div className="p-6 bg-slate-50/30 flex-1 overflow-y-auto">
-                    {/* Metric Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
                         <div>
@@ -227,7 +222,6 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Charts */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                         <h4 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -245,7 +239,7 @@ export default function AdminDashboard() {
                                 ))}
                               </Pie>
                               <Tooltip />
-                              <Legend verticalAlign="bottom" height={36}/>
+                              <Legend verticalAlign="bottom" height={36} />
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
@@ -294,8 +288,8 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <select 
-                              value={u.role} 
+                            <select
+                              value={u.role}
                               onChange={(e) => handleRoleUpdate(u._id, e.target.value)}
                               className="rounded border border-slate-200 bg-transparent py-1 px-2 text-xs font-semibold"
                             >

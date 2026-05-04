@@ -22,7 +22,7 @@ const venueSchema = new mongoose.Schema(
         required: true,
       },
       coordinates: {
-        type: [Number], // [lng, lat]
+        type: [Number], 
         required: true,
       },
     },
@@ -55,8 +55,7 @@ const venueSchema = new mongoose.Schema(
     },
 
     images: [String],
-
-    // Cached analytics
+ 
     crowdSummary: {
       bestHours: [Number],
       peakHours: [Number],
@@ -70,11 +69,9 @@ const venueSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-// GEO INDEX (IMPORTANT)
+ 
 venueSchema.index({ location: "2dsphere" });
-
-// SEARCH INDEXES (NEW: For Performance)
+ 
 venueSchema.index({ name: "text", category: "text", address: "text" });
 venueSchema.index({ name: 1 });
 

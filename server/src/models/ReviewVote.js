@@ -1,4 +1,3 @@
-// models/ReviewVote.js
 import mongoose from "mongoose";
 
 const reviewVoteSchema = new mongoose.Schema(
@@ -15,7 +14,6 @@ const reviewVoteSchema = new mongoose.Schema(
       required: true,
     },
 
-    // "helpful" = thumbs up, "suspicious" = flag as fake
     type: {
       type: String,
       enum: ["helpful", "suspicious"],
@@ -24,8 +22,7 @@ const reviewVoteSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-// One vote record per (user, review) pair — prevents duplicate votes at DB level
+ 
 reviewVoteSchema.index({ userId: 1, reviewId: 1 }, { unique: true });
 
 export default mongoose.model("ReviewVote", reviewVoteSchema);

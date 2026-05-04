@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { submitCrowdReport } from "../services/crowdApi";
 import { useAuth } from "../contexts/AuthContext";
-
-// Key is scoped to the user — different users on the same browser don't
-// interfere with each other's cooldown state.
 const STORAGE_KEY = (userId) => `crowdReport_${userId}_hourly`;
 
 function isWithinSameHour(isoTimestamp) {
@@ -28,8 +25,6 @@ export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
   const [error, setError] = useState("");
   const [lockedUntil, setLockedUntil] = useState(null);
 
-  // On mount or user/venue change: check if THIS user already reported this hour.
-  // Re-runs when userId changes (account switch) or venueId changes (navigation).
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY(userId));
     if (stored && isWithinSameHour(stored)) {
@@ -46,7 +41,6 @@ export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
 
     try {
       await submitCrowdReport(venueId, status);
-      // Lock UI for this specific user and persist to localStorage
       const now = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY(userId), now);
       setLockedUntil(now);
@@ -54,7 +48,6 @@ export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
     } catch (err) {
       const data = err.response?.data;
       if (err.response?.status === 429 && data?.nextAllowedAt) {
-        // Server confirmed duplicate — lock UI silently
         const now = new Date().toISOString();
         localStorage.setItem(STORAGE_KEY(userId), now);
         setLockedUntil(now);
@@ -67,7 +60,6 @@ export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
     }
   };
 
-  // ── Locked state (this user already reported this hour) ───────────────────
   if (lockedUntil && isWithinSameHour(lockedUntil)) {
     return (
       <div className="mt-4 pt-4 border-t border-slate-100">
@@ -82,7 +74,6 @@ export default function CrowdReportToggle({ venueId, onReportSubmitted }) {
     );
   }
 
-  // ── Normal state ──────────────────────────────────────────────────────────
   return (
     <div className="mt-4 pt-4 border-t border-slate-100">
       <p className="text-sm font-semibold text-slate-800 mb-2">How is it right now?</p>

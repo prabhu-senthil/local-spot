@@ -5,8 +5,7 @@ import { calculateTrustScore } from "../utils/trustCalculator.js";
 export const calculateTrust = async (venueId) => {
   try {
     const rawReviews = await Review.find({ venueId }).populate("userId", "role").lean();
-    
-    // Map reviews to include counts and user role for logic
+     
     const reviews = rawReviews.map(r => ({
       ...r,
       userRole: r.userId?.role || "user",
@@ -24,8 +23,7 @@ export const calculateTrust = async (venueId) => {
         console.warn(`[TrustLocal] Anomalies detected for venue ${venueId}: ${result.message}`);
       }
     }
-
-    // Upsert the TrustScore in the collection
+ 
     const updatedTrustScore = await TrustScore.findOneAndUpdate(
       { venueId },
       { score: trustScoreValue, lastCalculated: Date.now() },
@@ -38,8 +36,7 @@ export const calculateTrust = async (venueId) => {
     throw err;
   }
 };
-
-// Optional: Keep an HTTP endpoint if needed
+ 
 export const getTrustScore = async (req, res) => {
   try {
     const { venueId } = req.params;

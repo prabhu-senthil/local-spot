@@ -5,17 +5,15 @@ export async function createCrowdReport(req, res) {
   try {
     const { venueId, status } = req.body;
     const userId = req.user.id;
-
-    // ── Guard 1: Owners and Admins cannot submit crowd reports ────────────
+ 
     if (req.user.role === "owner" || req.user.role === "admin") {
       return res.status(403).json({
         message: `${req.user.role === "owner" ? "Venue owners" : "Administrators"} are not allowed to submit crowd reports.`
       });
     }
-
-    // ── Guard 2: 1 report per user per calendar hour (any venue) ────────────
+ 
     const startOfHour = new Date();
-    startOfHour.setMinutes(0, 0, 0); // floor to HH:00:00.000
+    startOfHour.setMinutes(0, 0, 0);
 
     const existingThisHour = await CrowdReport.findOne({
       userId,
@@ -29,16 +27,14 @@ export async function createCrowdReport(req, res) {
         nextAllowedAt
       });
     }
-
-    // ── Create report ─────────────────────────────────────────────────────
+ 
     const newReport = await CrowdReport.create({
       venueId,
       userId,
       status,
       createdAt: new Date()
     });
-
-    // ── Update hourly aggregation ─────────────────────────────────────────
+ 
     const now = new Date();
     const hour = now.getHours();
     const dayOfWeek = now.getDay();

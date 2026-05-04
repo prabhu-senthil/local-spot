@@ -49,7 +49,7 @@ app.use(errorHandler);
 
 await connectDB();
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Backend started on port ${PORT}`);
 });
 

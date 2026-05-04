@@ -16,16 +16,14 @@ export async function createReview(req, res) {
         .status(403)
         .json({ message: `${userRole === "owner" ? "Restaurant owners" : "Administrators"} cannot submit reviews.` });
     }
-
-    // ── Blocked-user guard ──────────────────────────────────────────────────
+ 
     if (req.user.status === "blocked") {
       return res.status(403).json({
         message:
           "Your account has been blocked due to a low trust score. You cannot submit reviews.",
       });
     }
-
-    // Analyse review: ML score + text quality heuristics combined
+ 
     const analysis = await detectFakeReview(reviewText, { rating, venueId });
 
     const newReview = await Review.create({
@@ -35,32 +33,25 @@ export async function createReview(req, res) {
       reviewText,
       crowdLevel,
       images: images || [],
-      visitTime: new Date(),
-      // Legacy fields (keep for backward compatibility with existing UI badge)
+      visitTime: new Date(), 
       mlScore: analysis.mlScore,
-      isSuspicious: analysis.isSuspicious,
-      // New three-tier classification fields
+      isSuspicious: analysis.isSuspicious, 
       suspicionScore: analysis.suspicionScore,
       suspicionClassification: analysis.classification,
     });
-
-    // Recalculate review count and average rating
+ 
     const allReviews = await Review.find({ venueId });
     const reviewCount = allReviews.length;
     const avgRating =
       allReviews.reduce((acc, r) => acc + (r.rating || 0), 0) / reviewCount;
-
-    // Update the Venue document with the new stats
+ 
     const Venue = (await import("../models/Venue.js")).default;
     await Venue.findByIdAndUpdate(venueId, { reviewCount, avgRating });
-
-    // Recalculate trust score for the venue asynchronously
+ 
     calculateTrust(venueId).catch(console.error);
-
-    // Update reviewer trust score and evaluate for role upgrade asynchronously
+ 
     applyTrustAndBlocking(userId).catch(console.error);
-
-    // Populate user info for the newly created review before returning
+ 
     await newReview.populate("userId", "name reviewerTrustScore status");
 
     return res.status(201).json(newReview);
@@ -85,10 +76,9 @@ export async function getReviewsByVenue(req, res) {
 export async function voteOnReview(req, res) {
   try {
     const { id } = req.params;
-    const { voteType } = req.body; // 'helpful' | 'suspicious'
+    const { voteType } = req.body;
     const userId = req.user.id;
-
-    // Validate voteType
+ 
     if (!["helpful", "suspicious"].includes(voteType)) {
       return res
         .status(400)
@@ -97,39 +87,30 @@ export async function voteOnReview(req, res) {
 
     const review = await Review.findById(id);
     if (!review) return res.status(404).json({ message: "Review not found" });
-
-    // ── Self-vote prevention ───────────────────────────────────────────────
-    // Compare as strings to handle ObjectId vs string mismatch
+ 
     if (String(review.userId) === String(userId)) {
       return res.status(403).json({
         message: "You cannot vote on your own review.",
       });
     }
-
-    // ── Duplicate-vote prevention via ReviewVote collection ───────────────
+ 
     const existingVote = await ReviewVote.findOne({ userId, reviewId: id });
 
     if (existingVote) {
-      if (existingVote.type === voteType) {
-        // Same type re-vote → idempotent 409 (no change needed)
+      if (existingVote.type === voteType) { 
         return res.status(409).json({
           message: `You have already voted '${voteType}' on this review.`,
         });
-      }
-      // Switching vote type → update the record
+      } 
       existingVote.type = voteType;
       await existingVote.save();
-    } else {
-      // First-time vote — create a record
+    } else { 
       await ReviewVote.create({ userId, reviewId: id, type: voteType });
     }
-
-    // ── Sync vote arrays on the Review document ───────────────────────────
-    // Initialise arrays defensively
+ 
     if (!review.helpfulVotes) review.helpfulVotes = [];
     if (!review.suspiciousVotes) review.suspiciousVotes = [];
-
-    // Remove user from both arrays first (handles vote-switch & idempotency)
+ 
     review.helpfulVotes.pull(userId);
     review.suspiciousVotes.pull(userId);
 
@@ -140,14 +121,11 @@ export async function voteOnReview(req, res) {
     }
 
     await review.save();
-
-    // Populate the userId so the frontend has the reviewer's name
+ 
     await review.populate("userId", "name reviewerTrustScore status");
-
-    // ── Recalculate reviewer's trust score ────────────────
+ 
     await applyTrustAndBlocking(review.userId);
-
-    // ── Return updated review + fresh reviewer info ───────────────────────
+ 
     const User = (await import("../models/User.js")).default;
     const reviewer = await User.findById(review.userId)
       .select("reviewerTrustScore status")

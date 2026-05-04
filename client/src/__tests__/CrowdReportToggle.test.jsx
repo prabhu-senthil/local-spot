@@ -7,6 +7,10 @@ vi.mock("../services/crowdApi", () => ({
   submitCrowdReport: vi.fn(),
 }));
 
+vi.mock("../contexts/AuthContext", () => ({
+  useAuth: () => ({ user: { _id: "testuser" } }),
+}));
+
 describe("CrowdReportToggle", () => {
   beforeEach(() => {
     vi.clearAllMocks();

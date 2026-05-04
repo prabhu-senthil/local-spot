@@ -1,14 +1,3 @@
-/**
- * crowd.integration.test.js
- *
- * Integration tests for POST /api/crowd:
- *   - Unauthenticated request → 401
- *   - Invalid status payload  → 400
- *   - Owner role blocked      → 403
- *   - Regular user, first submit in the hour → 201
- *   - Regular user, second submit in the same hour → 429
- *   - 429 response contains a valid nextAllowedAt timestamp at :00 minutes
- */
 
 import { describe, it, expect, vi } from "vitest";
 import request from "supertest";
@@ -16,11 +5,9 @@ import express from "express";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 
-// ── Top-level mocks (must be before any imports that use these modules) ───────
-
 vi.mock("../models/CrowdReport.js", () => ({
   default: {
-    findOne: vi.fn().mockResolvedValue(null), // default: no prior report this hour
+    findOne: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue({ _id: "cr1", status: "busy" }),
   },
 }));
@@ -31,7 +18,6 @@ vi.mock("../models/CrowdAnalytics.js", () => ({
   },
 }));
 
-// Map of tokenId → role, populated when tokens are created below
 const tokenRoles = new Map();
 
 vi.mock("../models/User.js", () => ({
@@ -39,14 +25,11 @@ vi.mock("../models/User.js", () => ({
     findById: vi.fn().mockImplementation((id) => ({
       select: vi.fn().mockResolvedValue({
         _id: id,
-        // Look up the role that was embedded in the JWT for this id
         role: tokenRoles.get(String(id)) ?? "user",
       }),
     })),
   },
 }));
-
-// ── App setup ─────────────────────────────────────────────────────────────────
 
 import crowdRoutes from "../routes/crowd.routes.js";
 
@@ -58,20 +41,18 @@ app.use("/api/crowd", crowdRoutes);
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const userId  = new mongoose.Types.ObjectId().toString();
+const userId = new mongoose.Types.ObjectId().toString();
 const ownerId = new mongoose.Types.ObjectId().toString();
-tokenRoles.set(userId,  "user");
+tokenRoles.set(userId, "user");
 tokenRoles.set(ownerId, "owner");
 
-const userToken  = jwt.sign({ id: userId,  role: "user"  }, JWT_SECRET, { expiresIn: "1h" });
+const userToken = jwt.sign({ id: userId, role: "user" }, JWT_SECRET, { expiresIn: "1h" });
 const ownerToken = jwt.sign({ id: ownerId, role: "owner" }, JWT_SECRET, { expiresIn: "1h" });
 
 const VALID_BODY = {
   venueId: new mongoose.Types.ObjectId().toString(),
   status: "busy",
 };
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("POST /api/crowd — Crowd Report Restrictions", () => {
   it("should return 401 when no auth token is provided", async () => {
@@ -99,7 +80,7 @@ describe("POST /api/crowd — Crowd Report Restrictions", () => {
 
   it("should return 201 when a regular user submits a valid crowd report (first this hour)", async () => {
     const CrowdReport = (await import("../models/CrowdReport.js")).default;
-    CrowdReport.findOne.mockResolvedValueOnce(null); // no prior report
+    CrowdReport.findOne.mockResolvedValueOnce(null);
 
     const res = await request(app)
       .post("/api/crowd")
@@ -112,7 +93,7 @@ describe("POST /api/crowd — Crowd Report Restrictions", () => {
 
   it("should return 429 when user submits a second report within the same hour", async () => {
     const CrowdReport = (await import("../models/CrowdReport.js")).default;
-    CrowdReport.findOne.mockResolvedValueOnce({ _id: "existing", status: "quiet" }); // already reported
+    CrowdReport.findOne.mockResolvedValueOnce({ _id: "existing", status: "quiet" });
 
     const res = await request(app)
       .post("/api/crowd")

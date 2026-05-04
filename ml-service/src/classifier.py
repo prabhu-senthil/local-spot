@@ -24,13 +24,11 @@ class FakeReviewClassifier:
         self.threshold = threshold
 
     def _extract_metadata_features(self, texts, ratings):
-        # features = [review_length, rating, exclamation_count]
         lengths = np.array([len(str(t)) for t in texts]).reshape(-1, 1)
         ratings = np.array(ratings).reshape(-1, 1)
         exclamations = np.array([str(t).count('!') for t in texts]).reshape(-1, 1)
         
-        # Normalize features (simple scaling)
-        lengths = lengths / 1000.0 # roughly normalize
+        lengths = lengths / 1000.0 
         exclamations = exclamations / 10.0
         
         return np.hstack([lengths, ratings, exclamations])
@@ -56,13 +54,10 @@ class FakeReviewClassifier:
             return False
 
         print(f"Loading dataset from {file_path}...")
-        # Load dataset
         df = pd.read_csv(file_path)
         
-        # Map Yelp labels (-1: Fake -> 1, 1: Real -> 0)
         df['Label'] = df['Label'].map({-1: 1, 1: 0})
         
-        # Sample for faster training as requested
         if len(df) > sample_size:
             print(f"Sampling {sample_size} rows...")
             df = df.sample(n=sample_size, random_state=42)
@@ -71,21 +66,17 @@ class FakeReviewClassifier:
         labels = df['Label'].tolist()
         ratings = df['Rating'].tolist()
 
-        # Train/Test Split
         X_text_train, X_text_test, y_train, y_test, r_train, r_test = train_test_split(
             texts, labels, ratings, test_size=0.2, random_state=42
         )
 
-        # Build features
         X_train = self._build_features(X_text_train, r_train, fit=True)
         X_test = self._build_features(X_text_test, r_test, fit=False)
 
-        # Train
         print(f"Training on {X_train.shape[0]} samples with {X_train.shape[1]} features...")
         self.model.fit(X_train, y_train)
         self.is_trained = True
 
-        # Evaluate
         y_pred = self.model.predict(X_test)
         print("\nModel Evaluation:")
         print(classification_report(y_test, y_pred))
@@ -120,41 +111,31 @@ class FakeReviewClassifier:
         rating = metadata.get('rating', 3) if metadata else 3
         X = self._build_features([text], [rating], fit=False)
         
-        prob = self.model.predict_proba(X)[0][1] # Probability of class 1 (Fake)
+        prob = self.model.predict_proba(X)[0][1] 
         
-        # Heuristics as requested
         if metadata:
             if metadata.get('rating_deviation', 0) > 2:
                 prob += 0.2
             if len(text) < 10:
                 prob += 0.1
         
-        # New: Repeated consecutive words logic (e.g., "SPAM SPAM", "FFFF FFFF")
         import re
-        # Matches any word that is followed by itself one or more times
         repeats = re.findall(r'(\b\w+\b)(?:\s+\1)+', text, re.IGNORECASE)
         if repeats:
-            # Add 15% boost for each unique repeated word found
             prob += 0.15 * len(repeats)
 
-        # New: Gibberish/Nonsense detection (e.g., "dsfghsgth")
-        # Check for long words with unrealistic vowel-to-consonant ratios
         vowels = set("aeiou")
         words = [w for w in text.lower().split() if len(w) > 4]
         nonsense_count = 0
         for w in words:
             v_count = sum(1 for char in w if char in vowels)
-            # If no vowels or less than 1 vowel per 5 chars, it's likely gibberish
             if v_count == 0 or len(w) / v_count > 5:
                 nonsense_count += 1
         
         if nonsense_count > 0:
             prob += 0.2 * nonsense_count
                 
-        # Clamp probability
         prob = max(0.0, min(1.0, float(prob)))
         
         return prob
-
-# Singleton instance
 classifier = FakeReviewClassifier()

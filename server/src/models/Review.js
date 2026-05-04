@@ -1,4 +1,3 @@
-// models/Review.js
 import mongoose from "mongoose";
 
 const reviewSchema = new mongoose.Schema(
@@ -34,8 +33,7 @@ const reviewSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
-
-    // snapshot of trust score (for weighted ratings)
+ 
     userTrustScore: {
       type: Number,
       default: 0.5,
@@ -60,7 +58,6 @@ const reviewSchema = new mongoose.Schema(
       default: [],
     },
     
-    // ML and Trust features
     mlScore: {
       type: Number,
       default: 0,
@@ -68,8 +65,7 @@ const reviewSchema = new mongoose.Schema(
     isSuspicious: {
       type: Boolean,
       default: false,
-    },
-    // Three-tier classification from fakeReviewDetectionService
+    }, 
     suspicionScore: {
       type: Number,
       default: 0,
@@ -90,8 +86,7 @@ const reviewSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-// INDEXES
+ 
 reviewSchema.index({ venueId: 1, createdAt: -1 });
 reviewSchema.index({ venueId: 1, visitTime: 1 });
 

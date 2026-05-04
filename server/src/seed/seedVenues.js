@@ -15,8 +15,7 @@ const seedVenues = async () => {
     console.log("MongoDB connected for seeding");
 
     await Venue.deleteMany();
-
-     // Add lastUpdated field dynamically
+ 
     const formattedVenues = venues.map((v) => ({
       ...v,
       crowdSummary: {
@@ -26,19 +25,6 @@ const seedVenues = async () => {
     }));
 
     await Venue.insertMany(formattedVenues);
-
-    /* await Venue.insertMany([
-      {
-        name: "Test Restaurant",
-        category: "Restaurant",
-        location: {
-          type: "Point",
-          coordinates: [-6.59, 53.38],
-        },
-      },
-    ]);
- */
-
    
     console.log("Data seeded");
     process.exit();

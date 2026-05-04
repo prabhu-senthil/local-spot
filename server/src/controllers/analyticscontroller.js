@@ -7,8 +7,7 @@ export async function getOwnerDashboard(req, res) {
     const isOwner = req.user.role === "owner";
     const isAdmin = req.user.role === "admin";
     const ownerId = req.user.id;
-
-    // 1. Fetch venues
+ 
     let query = {};
     if (isOwner) {
       query = { ownerId };
@@ -39,12 +38,10 @@ export async function getOwnerDashboard(req, res) {
         category: primaryVenue.category
       };
     }
-
-    // 2. Overview Stats
+ 
     const totalVenues = venues.length;
     let globalAvgRating = 0;
-    
-    // Fetch exact review count directly from the Reviews collection
+     
     const totalReviews = await Review.countDocuments(isAdmin ? {} : { venueId: { $in: venueIds } });
     
     if (venues.length > 0) {
@@ -57,8 +54,7 @@ export async function getOwnerDashboard(req, res) {
         globalAvgRating = venues.reduce((acc, v) => acc + (v.avgRating || 0), 0) / venues.length;
       }
     }
-
-    // 3. Top Venues (Top 5 by avgRating and reviewCount)
+ 
     const topVenues = [...venues]
       .sort((a, b) => b.avgRating - a.avgRating || b.reviewCount - a.reviewCount)
       .slice(0, 5)
@@ -67,8 +63,7 @@ export async function getOwnerDashboard(req, res) {
         rating: Math.round((v.avgRating || 0) * 10) / 10,
         reviews: v.reviewCount || 0
       }));
-
-    // 4. Crowd Insight aggregation — group by dayOfWeek × hour
+ 
     const heatmapRaw = await CrowdAnalytics.aggregate([
       { $match: { venueId: { $in: venueIds } } },
       {
@@ -81,8 +76,7 @@ export async function getOwnerDashboard(req, res) {
       },
       { $sort: { "_id.day": 1, "_id.hour": 1 } }
     ]);
-
-    // Build a lookup map and zero-fill all 168 day×hour slots
+ 
     const heatmapLookup = new Map(
       heatmapRaw.map(d => [`${d._id.day}_${d._id.hour}`, d])
     );
@@ -100,8 +94,7 @@ export async function getOwnerDashboard(req, res) {
         });
       }
     }
-
-    // 5. Fetch recent reviews for detailed view
+ 
     const allReviews = await Review.find({ venueId: { $in: venueIds } })
       .populate("userId", "name email")
       .populate("venueId", "name")

@@ -2,10 +2,7 @@ import { v2 as cloudinary } from "cloudinary";
 
 export async function generateSignature(req, res) {
   try {
-    const timestamp = Math.round(new Date().getTime() / 1000);
-    
-    // Cloudinary config should be set from environment variables automatically if CLOUDINARY_URL is present, 
-    // but we can explicitly set it to be safe, assuming the user added it to .env
+    const timestamp = Math.round(new Date().getTime() / 1000); 
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,

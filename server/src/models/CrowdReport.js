@@ -24,10 +24,9 @@ const CrowdSchema = new mongoose.Schema({
     default: Date.now
   }
 });
-
-// Efficient per-user rate limit lookup (user-global, not venue-scoped)
+ 
 CrowdSchema.index({ userId: 1, createdAt: 1 });
-// Efficient venue-level analytics aggregation
+ 
 CrowdSchema.index({ venueId: 1, createdAt: 1 });
 
 export default mongoose.model("CrowdReport", CrowdSchema);

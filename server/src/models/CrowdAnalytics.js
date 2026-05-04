@@ -1,4 +1,3 @@
-// models/CrowdAnalytics.js
 import mongoose from "mongoose";
 
 const crowdAnalyticsSchema = new mongoose.Schema(

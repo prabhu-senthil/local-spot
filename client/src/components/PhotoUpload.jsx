@@ -22,7 +22,6 @@ export default function PhotoUpload({ onUploadComplete, maxPhotos = 1, currentPh
       return;
     }
 
-    // Validate file types and sizes (max 5MB)
     const validFiles = files.filter(f => {
       if (!f.type.startsWith('image/')) {
         setError('Only image files are allowed.');
@@ -41,12 +40,9 @@ export default function PhotoUpload({ onUploadComplete, maxPhotos = 1, currentPh
     setError('');
 
     try {
-      // 1. Get signature from our backend
       const sigRes = await apiClient.get("/upload/signature");
-      
-      const { signature, timestamp, cloudName, apiKey } = sigRes.data;
 
-      // 2. Upload to Cloudinary
+      const { signature, timestamp, cloudName, apiKey } = sigRes.data;
       const newUrls = [];
       for (const file of validFiles) {
         const formData = new FormData();
@@ -71,7 +67,6 @@ export default function PhotoUpload({ onUploadComplete, maxPhotos = 1, currentPh
       setError('Failed to upload image. Please try again.');
     } finally {
       setUploading(false);
-      // Reset input
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -114,9 +109,8 @@ export default function PhotoUpload({ onUploadComplete, maxPhotos = 1, currentPh
           />
           <label
             htmlFor="photo-upload"
-            className={`flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-dashed rounded-xl cursor-pointer transition ${
-              uploading ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-brand-light/30 hover:border-brand hover:text-brand'
-            }`}
+            className={`flex items-center justify-center gap-2 w-full py-3 px-4 border-2 border-dashed rounded-xl cursor-pointer transition ${uploading ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-50 border-slate-300 text-slate-600 hover:bg-brand-light/30 hover:border-brand hover:text-brand'
+              }`}
           >
             {uploading ? (
               <>

@@ -6,7 +6,6 @@ import apiClient from "../services/apiClient";
 
 vi.mock("../services/apiClient");
 
-// A dummy component to consume the context
 function TestComponent() {
   const { user, token, loading, error, login, logout, register } = useAuth();
 
@@ -48,7 +47,7 @@ describe("AuthContext", () => {
 
   it("should load user if token exists in localStorage", async () => {
     localStorage.setItem("localspot_auth", JSON.stringify({ token: "valid-token" }));
-    
+
     apiClient.get.mockResolvedValueOnce({
       data: { id: "1", name: "Saved User", email: "saved@test.com", role: "user" }
     });
@@ -67,7 +66,7 @@ describe("AuthContext", () => {
 
   it("should clear auth if token is invalid", async () => {
     localStorage.setItem("localspot_auth", JSON.stringify({ token: "invalid-token" }));
-    
+
     apiClient.get.mockRejectedValueOnce({
       response: { data: { message: "Invalid token" } }
     });

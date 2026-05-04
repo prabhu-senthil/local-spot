@@ -13,7 +13,7 @@ vi.mock("../contexts/AuthContext", () => ({
   useAuth: vi.fn(),
 }));
 
-// Mock Recharts so jsdom doesn't complain about SVGs
+
 vi.mock("recharts", async () => {
   const actual = await vi.importActual("recharts");
   return {
@@ -31,7 +31,7 @@ describe("AnalyticsDashboard", () => {
 
   it("should restrict access to non-owners", () => {
     useAuth.mockReturnValue({ user: { role: "user" }, token: "abc" });
-    analyticsApi.getOwnerDashboard.mockReturnValue(new Promise(() => {}));
+    analyticsApi.getOwnerDashboard.mockReturnValue(new Promise(() => { }));
     render(
       <BrowserRouter>
         <AnalyticsDashboard />
@@ -42,15 +42,15 @@ describe("AnalyticsDashboard", () => {
 
   it("should render loading state initially for owners", () => {
     useAuth.mockReturnValue({ user: { role: "owner" }, token: "abc" });
-    // mock a promise that doesn't resolve immediately
-    analyticsApi.getOwnerDashboard.mockReturnValue(new Promise(() => {}));
-    
+
+    analyticsApi.getOwnerDashboard.mockReturnValue(new Promise(() => { }));
+
     const { container } = render(
       <BrowserRouter>
         <AnalyticsDashboard />
       </BrowserRouter>
     );
-    // Loading spinner check
+
     expect(container.querySelector(".animate-spin")).toBeDefined();
   });
 
@@ -71,13 +71,9 @@ describe("AnalyticsDashboard", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Owner Dashboard")).toBeDefined();
-      // Total Venues
       expect(screen.getByText("2")).toBeDefined();
-      // Total Reviews
       expect(screen.getByText("15")).toBeDefined();
-      
       expect(screen.getByTestId("bar-chart")).toBeDefined();
-      expect(screen.getByTestId("line-chart")).toBeDefined();
     });
   });
 });

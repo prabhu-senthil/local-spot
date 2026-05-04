@@ -18,7 +18,7 @@ export default function ReviewForm({ venueId, onReviewSubmitted }) {
       setError("Please select a rating.");
       return;
     }
-    
+
     setIsSubmitting(true);
     setError("");
 
@@ -30,7 +30,7 @@ export default function ReviewForm({ venueId, onReviewSubmitted }) {
         crowdLevel,
         images
       });
-      
+
       setRating(0);
       setReviewText("");
       setCrowdLevel("moderate");
@@ -48,7 +48,7 @@ export default function ReviewForm({ venueId, onReviewSubmitted }) {
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mt-6">
       <h3 className="text-lg font-bold text-slate-800 mb-4">Leave a Review</h3>
-      
+
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
           {error}
@@ -56,7 +56,6 @@ export default function ReviewForm({ venueId, onReviewSubmitted }) {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Rating */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Rating</label>
           <div className="flex gap-1">
@@ -70,18 +69,16 @@ export default function ReviewForm({ venueId, onReviewSubmitted }) {
                 onClick={() => setRating(star)}
               >
                 <Star
-                  className={`w-6 h-6 ${
-                    star <= (hoverRating || rating)
+                  className={`w-6 h-6 ${star <= (hoverRating || rating)
                       ? "text-orange-400 fill-current"
                       : "text-slate-200"
-                  }`}
+                    }`}
                 />
               </button>
             ))}
           </div>
         </div>
 
-        {/* Crowd Level */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Crowd Level</label>
           <div className="flex gap-3">
@@ -101,7 +98,6 @@ export default function ReviewForm({ venueId, onReviewSubmitted }) {
           </div>
         </div>
 
-        {/* Review Text */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Your Experience</label>
           <textarea
@@ -113,12 +109,11 @@ export default function ReviewForm({ venueId, onReviewSubmitted }) {
           ></textarea>
         </div>
 
-        {/* Photos */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Add Photos (Optional)</label>
-          <PhotoUpload 
-            onUploadComplete={(urls) => setImages(urls)} 
-            maxPhotos={3} 
+          <PhotoUpload
+            onUploadComplete={(urls) => setImages(urls)}
+            maxPhotos={3}
             currentPhotos={images}
           />
         </div>

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import Role from "../models/roles.js";
+import Role from "../models/Roles.js";
 
 function generateAccessToken(user) {
   return jwt.sign(
@@ -23,7 +23,7 @@ const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict",
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
 export async function register(req, res, _next) {
@@ -104,8 +104,6 @@ export async function login(req, res, _next) {
 }
 
 export async function me(req, res) {
-  // req.user is already populated by the protect middleware (excluding passwordHash)
-  // Return a clean shape that includes trust fields for the frontend
   return res.status(200).json({
     id: req.user._id,
     name: req.user.name,
@@ -124,7 +122,6 @@ export async function init(req, res) {
       return res.status(200).json({ roles: ["user", "reviewer", "admin", "owner"] });
     }
     let rawRoles = roleDoc.roles;
-    // Inject 'Reviewer' if missing from database
     if (!rawRoles.some(r => r.toLowerCase() === 'reviewer')) {
       rawRoles.push('Reviewer');
     }
