@@ -1,9 +1,3 @@
-/**
- * textQualityAnalyzer.test.js
- * Unit tests for all text quality heuristic functions.
- * No mocks needed — all functions are pure and synchronous.
- */
-
 import { describe, it, expect } from "vitest";
 import {
   detectRepeatedWords,
@@ -13,7 +7,6 @@ import {
   analyzeTextQuality,
 } from "../../utils/textQualityAnalyzer.js";
 
-// ─── detectRepeatedWords ───────────────────────────────────────────────────
 
 describe("detectRepeatedWords", () => {
   it("should NOT flag normal text with no repetition", () => {
@@ -31,7 +24,7 @@ describe("detectRepeatedWords", () => {
   it("should flag text with multiple distinct repeated pairs and cap penalty", () => {
     const result = detectRepeatedWords("FFFF FFFF SPAM SPAM SPAM great great great");
     expect(result.flagged).toBe(true);
-    expect(result.penalty).toBeLessThanOrEqual(0.75); // penalty is capped
+    expect(result.penalty).toBeLessThanOrEqual(0.75);
   });
 
   it("should handle empty/null text gracefully", () => {
@@ -40,7 +33,6 @@ describe("detectRepeatedWords", () => {
   });
 });
 
-// ─── detectGibberish ──────────────────────────────────────────────────────
 
 describe("detectGibberish", () => {
   it("should NOT flag normal English words", () => {
@@ -58,16 +50,15 @@ describe("detectGibberish", () => {
   it("should flag multiple gibberish words and cap the penalty", () => {
     const result = detectGibberish("xyzxyz dsfghsgth qwrtyp blmprst something");
     expect(result.flagged).toBe(true);
-    expect(result.penalty).toBeLessThanOrEqual(0.6); // penalty is capped
+    expect(result.penalty).toBeLessThanOrEqual(0.6);
   });
 
   it("should NOT flag short words (≤4 chars) even if they look odd", () => {
-    const result = detectGibberish("xyz abc qwz"); // all ≤4 chars, skipped
+    const result = detectGibberish("xyz abc qwz");
     expect(result.flagged).toBe(false);
   });
 });
 
-// ─── detectExcessivePunctuation ───────────────────────────────────────────
 
 describe("detectExcessivePunctuation", () => {
   it("should NOT flag normal punctuation", () => {
@@ -94,7 +85,6 @@ describe("detectExcessivePunctuation", () => {
   });
 });
 
-// ─── detectShortReview ────────────────────────────────────────────────────
 
 describe("detectShortReview", () => {
   it("should flag text with fewer than 10 characters", () => {
@@ -104,7 +94,7 @@ describe("detectShortReview", () => {
   });
 
   it("should NOT flag text with 10 or more characters", () => {
-    const result = detectShortReview("Great food"); // exactly 10 chars
+    const result = detectShortReview("Great food"); 
     expect(result.flagged).toBe(false);
     expect(result.penalty).toBe(0);
   });
@@ -115,7 +105,6 @@ describe("detectShortReview", () => {
   });
 });
 
-// ─── analyzeTextQuality (orchestrator) ────────────────────────────────────
 
 describe("analyzeTextQuality", () => {
   it("should return zero penalty and no flags for a clean genuine review", () => {
@@ -127,7 +116,6 @@ describe("analyzeTextQuality", () => {
   });
 
   it("should accumulate penalties for multiple issues", () => {
-    // Short + excessive punctuation
     const result = analyzeTextQuality("ok!!!!!!!");
     expect(result.flags).toContain("TOO_SHORT");
     expect(result.flags).toContain("EXCESSIVE_PUNCTUATION");
@@ -140,8 +128,7 @@ describe("analyzeTextQuality", () => {
     expect(result.penaltyScore).toBeGreaterThan(0);
   });
 
-  it("should clamp combined penalty to a max of 1.0", () => {
-    // All four checks triggered simultaneously
+  it("should clamp combined penalty to a max of 1.0", () => { 
     const result = analyzeTextQuality("xy!!!!!!!! SPAM SPAM dsfghsgth qwrtyp");
     expect(result.penaltyScore).toBeLessThanOrEqual(1.0);
     expect(result.penaltyScore).toBeGreaterThan(0);

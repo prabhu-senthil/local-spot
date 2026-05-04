@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
-
-// Models
+import dotenv from "dotenv"; 
 import Review from "./src/models/Review.js";
 import Venue from "./src/models/Venue.js";
 import TrustScore from "./src/models/TrustScore.js";
@@ -11,13 +9,9 @@ dotenv.config();
 const resetReviews = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URL || "mongodb://localhost:27017/localspot");
-    console.log("MongoDB connected.");
-
-    // 1. Delete all reviews
+    console.log("MongoDB connected."); 
     const deleteResult = await Review.deleteMany({});
-    console.log(`Deleted ${deleteResult.deletedCount} reviews.`);
-
-    // 2. Reset venue stats
+    console.log(`Deleted ${deleteResult.deletedCount} reviews.`); 
     const updateResult = await Venue.updateMany(
       {},
       { 
@@ -27,9 +21,7 @@ const resetReviews = async () => {
         } 
       }
     );
-    console.log(`Reset stats for ${updateResult.modifiedCount} venues.`);
-
-    // 3. Delete all trust scores to start fresh
+    console.log(`Reset stats for ${updateResult.modifiedCount} venues.`); 
     const trustResult = await TrustScore.deleteMany({});
     console.log(`Deleted ${trustResult.deletedCount} trust score records.`);
 

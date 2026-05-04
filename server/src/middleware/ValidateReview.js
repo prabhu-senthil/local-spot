@@ -1,5 +1,3 @@
-// src/middleware/validationMiddleware.js
-
 export const validateReview = (req, res, next) => {
     const { venueId, rating, comment } = req.body;
 

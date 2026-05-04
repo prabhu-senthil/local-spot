@@ -3,10 +3,9 @@ import { getNotificationsByUser, markNotificationRead } from "../controllers/not
 
 const router = express.Router();
 
-// GET /api/notifications/:userId
+ 
 router.get("/:userId", getNotificationsByUser);
 
-// PATCH /api/notifications/:id/read
 router.patch("/:id/read", markNotificationRead);
 
 export default router;

@@ -4,11 +4,7 @@ import Venue from "../models/Venue.js";
 import CrowdReport from "../models/CrowdReport.js";
 import CrowdAnalytics from "../models/CrowdAnalytics.js";
 import bcrypt from "bcryptjs";
-
-/**
- * GET /api/admin/users
- * Returns a list of all users with optional filtering by role.
- */
+ 
 export async function getAllUsers(req, res) {
   try {
     const { role, status } = req.query;
@@ -27,10 +23,7 @@ export async function getAllUsers(req, res) {
   }
 }
 
-/**
- * PATCH /api/admin/users/:userId/status
- * Updates a user's account status (active, blocked).
- */
+
 export async function updateUserStatus(req, res) {
   try {
     const { userId } = req.params;
@@ -50,10 +43,7 @@ export async function updateUserStatus(req, res) {
   }
 }
 
-/**
- * PATCH /api/admin/users/:userId/role
- * Promotes or changes a user's role.
- */
+
 export async function updateUserRole(req, res) {
   try {
     const { userId } = req.params;
@@ -73,10 +63,6 @@ export async function updateUserRole(req, res) {
   }
 }
 
-/**
- * POST /api/admin/users/:userId/reset-password
- * Resets a user's password to a temporary default.
- */
 export async function resetUserPassword(req, res) {
   try {
     const { userId } = req.params;
@@ -95,11 +81,6 @@ export async function resetUserPassword(req, res) {
   }
 }
 
-/**
- * GET /api/admin/trust-metrics
- * Returns all users with trust score data, sorted by score ascending.
- * Flagged/blocked reviewers appear first.
- */
 export async function getTrustMetrics(req, res) {
   try {
     const users = await User.find(
@@ -108,8 +89,7 @@ export async function getTrustMetrics(req, res) {
     )
       .sort({ reviewerTrustScore: 1 })
       .lean();
-
-    // Fetch review counts and vote tallies for each user
+     
     const enriched = await Promise.all(
       users.map(async (u) => {
         const reviews = await Review.find({ userId: u._id }).lean();
@@ -151,10 +131,7 @@ export async function getTrustMetrics(req, res) {
   }
 }
 
-/**
- * POST /api/admin/users/:userId/unblock
- * Manually unblock a reviewer and reset their trust score.
- */
+
 export async function unblockReviewer(req, res) {
   try {
     const { userId } = req.params;
@@ -177,15 +154,7 @@ export async function unblockReviewer(req, res) {
     return res.status(500).json({ message: "Failed to unblock reviewer." });
   }
 }
-/**
- * GET /api/admin/suspicious-reviews
- * Returns all reviews flagged as suspicious or highly_suspicious,
- * sorted by suspicionScore descending. Includes reviewer name for admin context.
- *
- * Query params:
- *   ?classification=suspicious|highly_suspicious  (optional filter)
- *   ?limit=50                                      (default 50)
- */
+ 
 export async function getSuspiciousReviews(req, res) {
   try {
     const { classification, limit = 50 } = req.query;
@@ -215,10 +184,6 @@ export async function getSuspiciousReviews(req, res) {
   }
 }
 
-/**
- * GET /api/admin/reviews
- * Returns all reviews, sorted by creation date.
- */
 export async function getAllReviews(req, res) {
   try {
     const { limit = 50, skip = 0 } = req.query;
@@ -239,10 +204,6 @@ export async function getAllReviews(req, res) {
   }
 }
 
-/**
- * DELETE /api/admin/reviews/:reviewId
- * Deletes a review from the database.
- */
 export async function deleteReview(req, res) {
   try {
     const { reviewId } = req.params;
@@ -256,10 +217,6 @@ export async function deleteReview(req, res) {
   }
 }
 
-/**
- * PATCH /api/admin/reviews/:reviewId/override
- * Overrides an ML suspicion flag, marking the review as genuine.
- */
 export async function overrideReview(req, res) {
   try {
     const { reviewId } = req.params;
@@ -281,11 +238,7 @@ export async function overrideReview(req, res) {
     return res.status(500).json({ message: "Failed to override review." });
   }
 }
-
-/**
- * GET /api/admin/crowd-reports
- * Returns all raw crowd reports, sorted by creation date.
- */
+ 
 export async function getAllCrowdReports(req, res) {
   try {
     const { limit = 50 } = req.query;
@@ -302,11 +255,7 @@ export async function getAllCrowdReports(req, res) {
     return res.status(500).json({ message: "Failed to fetch crowd reports." });
   }
 }
-
-/**
- * DELETE /api/admin/crowd-reports/:reportId
- * Deletes a crowd report.
- */
+ 
 export async function deleteCrowdReport(req, res) {
   try {
     const { reportId } = req.params;
@@ -319,11 +268,7 @@ export async function deleteCrowdReport(req, res) {
     return res.status(500).json({ message: "Failed to delete crowd report." });
   }
 }
-
-/**
- * POST /api/admin/venues/:venueId/crowd-reset
- * Resets all crowd analytics and deletes all reports for a specific venue.
- */
+ 
 export async function resetVenueCrowdData(req, res) {
   try {
     const { venueId } = req.params;
@@ -340,15 +285,10 @@ export async function resetVenueCrowdData(req, res) {
   }
 }
 
-/**
- * GET /api/admin/venues
- * Returns all venues with optional approvalStatus filter.
- */
 export async function getAllAdminVenues(req, res) {
   try {
     const { sort = "-createdAt" } = req.query;
     
-    // If sorting by owner name, we need an aggregation to join the users collection
     if (sort === "ownerName" || sort === "-ownerName") {
       const order = sort.startsWith("-") ? -1 : 1;
       const venues = await Venue.aggregate([
@@ -374,9 +314,6 @@ export async function getAllAdminVenues(req, res) {
         { $sort: { ownerName: order } }
       ]);
       
-      // Manually map to match the lean() populate structure if needed, 
-      // but usually the frontend handles the flat structure or we nested it.
-      // Let's ensure consistency by mapping back to an 'ownerId' object structure
       const formatted = venues.map(v => ({
         ...v,
         ownerId: v.owner ? { _id: v.owner._id, name: v.owner.name, email: v.owner.email } : null
@@ -396,11 +333,7 @@ export async function getAllAdminVenues(req, res) {
     return res.status(500).json({ message: "Failed to fetch venues." });
   }
 }
-
-/**
- * PATCH /api/admin/venues/:venueId/approval
- * Approves or rejects a venue claim.
- */
+ 
 export async function updateVenueApproval(req, res) {
   try {
     const { venueId } = req.params;
@@ -419,11 +352,7 @@ export async function updateVenueApproval(req, res) {
     return res.status(500).json({ message: "Failed to update venue approval." });
   }
 }
-
-/**
- * PATCH /api/admin/venues/:venueId/details
- * Administrative edit of venue details.
- */
+ 
 export async function updateVenueDetails(req, res) {
   try {
     const { venueId } = req.params;
@@ -438,18 +367,13 @@ export async function updateVenueDetails(req, res) {
     return res.status(500).json({ message: "Failed to update venue details." });
   }
 }
-
-/**
- * DELETE /api/admin/venues/:venueId
- * Permanently removes a venue and its associated data.
- */
+ 
 export async function deleteVenue(req, res) {
   try {
     const { venueId } = req.params;
     const venue = await Venue.findByIdAndDelete(venueId);
     if (!venue) return res.status(404).json({ message: "Venue not found." });
 
-    // Cleanup associated data
     await Promise.all([
       Review.deleteMany({ venueId }),
       CrowdReport.deleteMany({ venueId }),
@@ -463,10 +387,6 @@ export async function deleteVenue(req, res) {
   }
 }
 
-/**
- * POST /api/admin/venues/merge
- * Merges source venue into target venue.
- */
 export async function mergeVenues(req, res) {
   try {
     const { sourceId, targetId } = req.body;
@@ -478,23 +398,20 @@ export async function mergeVenues(req, res) {
     ]);
 
     if (!source || !target) return res.status(404).json({ message: "One or both venues not found." });
-
-    // Transfer reviews and reports
+ 
     await Promise.all([
       Review.updateMany({ venueId: sourceId }, { venueId: targetId }),
       CrowdReport.updateMany({ venueId: sourceId }, { venueId: targetId }),
       CrowdAnalytics.deleteMany({ venueId: sourceId }) // Target will have its own analytics
     ]);
-
-    // Recalculate target stats
+ 
     const reviews = await Review.find({ venueId: targetId });
     target.reviewCount = reviews.length;
     target.avgRating = reviews.length > 0 
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
       : 0;
     await target.save();
-
-    // Delete source
+ 
     await Venue.findByIdAndDelete(sourceId);
 
     return res.status(200).json({ message: "Venues merged successfully.", target });
@@ -503,11 +420,7 @@ export async function mergeVenues(req, res) {
     return res.status(500).json({ message: "Failed to merge venues." });
   }
 }
-
-/**
- * PATCH /api/admin/users/:userId/trust-score
- * Manually adjusts a user's trust score.
- */
+ 
 export async function updateUserTrustScore(req, res) {
   try {
     const { userId } = req.params;
@@ -527,11 +440,7 @@ export async function updateUserTrustScore(req, res) {
     return res.status(500).json({ message: "Failed to adjust trust score." });
   }
 }
-
-/**
- * GET /api/admin/stats
- * Returns platform-wide statistics for the admin dashboard.
- */
+ 
 export async function getPlatformStats(req, res) {
   try {
     const [totalUsers, totalReviews, totalVenues] = await Promise.all([
@@ -539,8 +448,7 @@ export async function getPlatformStats(req, res) {
       Review.countDocuments(),
       Venue.countDocuments()
     ]);
-
-    // Review classification stats
+ 
     const reviewStats = await Review.aggregate([
       {
         $group: {
@@ -549,15 +457,13 @@ export async function getPlatformStats(req, res) {
         }
       }
     ]);
-
-    // Top venues by review count
+ 
     const topVenues = await Venue.find()
       .sort({ reviewCount: -1 })
       .limit(5)
       .select("name reviewCount avgRating")
       .lean();
-
-    // Global crowd trends (busiest hours across platform)
+ 
     const crowdTrends = await CrowdAnalytics.aggregate([
       {
         $group: {

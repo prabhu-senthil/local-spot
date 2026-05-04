@@ -1,8 +1,7 @@
  import bcrypt from "bcryptjs";
  import nodemailer from "nodemailer"; 
  
-export const generateOTP = () => {
-  // Generate a 6-digit random number
+export const generateOTP = () => { 
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
@@ -17,7 +16,7 @@ export const verifyOTP = async (otp, hashedOTP) => {
 
 export const sendOTPEmail = async (email, otp) => {
   const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',  // or your SMTP host
+    host: 'smtp.gmail.com',
     port: 587,
     service: "gmail",
     auth: {
@@ -25,8 +24,6 @@ export const sendOTPEmail = async (email, otp) => {
       pass: process.env.GMAIL_PASS,
     },
   }); 
- 
-  // Fallback for development if credentials are not provided
   if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
     console.log("*************************************************");
     console.log(`Couldn't send OTP for ${email}`);
@@ -57,8 +54,7 @@ export const sendOTPEmail = async (email, otp) => {
     await transporter.sendMail(mailOptions);
     console.log(`OTP email sent successfully to ${email}`);
   } catch (error) {
-    console.error("Error sending OTP email:", error);
-    // In dev, we might still want to see the OTP even if mail fails
+    console.error("Error sending OTP email:", error); 
     console.log(`[FALLBACK] OTP for ${email}: ${otp}`);
   }
 };
