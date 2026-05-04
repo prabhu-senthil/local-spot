@@ -1,0 +1,59 @@
+# .gitlab-ci.yml for LocalSpot MERN Application
+
+stages:
+  - build
+  - deploy
+
+# ==========================================
+# BUILD STAGE
+# ==========================================
+# This stage runs on every branch commit to ensure the application 
+# builds successfully and pushes the updated images to the GitLab Registry.
+build:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  tags:
+    - dockerbuild
+  before_script:
+    # Authenticate with the GitLab Container Registry
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    # Build and push the docker images. 
+    # Note: Using the actual service names defined in your docker-compose.yml
+    - docker compose -f docker-compose.yml -f docker-compose.cicd.yml build --push backend frontend ml_service
+  rules:
+    # Run the build stage on any branch commit
+    - if: $CI_COMMIT_BRANCH
+
+# ==========================================
+# DEPLOY STAGE
+# ==========================================
+# This stage deploys the application to the Maynooth University server.
+# It only runs on the 'main' branch and requires manual intervention.
+deploy:
+  stage: deploy
+  tags:
+    - fyp
+  needs:
+    - build
+  before_script:
+    # Authenticate with the GitLab Container Registry to pull the built images
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    # Merge the base and CI/CD docker-compose files into a single production configuration
+    - docker compose -f docker-compose.yml -f docker-compose.cicd.yml config > production.yml
+    
+    # Stop and remove any currently running containers for this project
+    - docker compose -f production.yml -p ${CI_PROJECT_PATH_SLUG} down
+    
+    # Start the latest containers using the newly pushed images
+    - docker compose -f production.yml -p ${CI_PROJECT_PATH_SLUG} up --pull always --wait
+  environment:
+    name: prod
+    url: http://${CI_PROJECT_PATH_SLUG}.msc.cs.nuim.ie
+  rules:
+    # Restrict deployment to the 'main' branch and require a manual click to trigger
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual

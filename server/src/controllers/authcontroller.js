@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import Role from "../models/roles.js";
+import Role from "../models/Roles.js";
 
 function generateAccessToken(user) {
   return jwt.sign(
@@ -103,7 +103,7 @@ export async function login(req, res, _next) {
   }
 }
 
-export async function me(req, res) { 
+export async function me(req, res) {
   return res.status(200).json({
     id: req.user._id,
     name: req.user.name,
@@ -121,7 +121,7 @@ export async function init(req, res) {
     if (!roleDoc || !roleDoc.roles) {
       return res.status(200).json({ roles: ["user", "reviewer", "admin", "owner"] });
     }
-    let rawRoles = roleDoc.roles; 
+    let rawRoles = roleDoc.roles;
     if (!rawRoles.some(r => r.toLowerCase() === 'reviewer')) {
       rawRoles.push('Reviewer');
     }

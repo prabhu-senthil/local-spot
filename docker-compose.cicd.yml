@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  backend:
+    image: ${CI_REGISTRY_IMAGE}/backend:${CI_COMMIT_REF_SLUG}
+    
+  frontend:
+    image: ${CI_REGISTRY_IMAGE}/frontend:${CI_COMMIT_REF_SLUG}
+   
+
+  ml_service:
+    image: ${CI_REGISTRY_IMAGE}/ml-service:${CI_COMMIT_REF_SLUG}
+   
+
+  nginx:
+    ports:
+      - "127.0.0.1:${CI_API_PORT}:80"
