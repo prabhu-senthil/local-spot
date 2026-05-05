@@ -72,7 +72,11 @@ export default function AdminDashboard() {
 
   const handleStatusUpdate = async (userId, status) => {
     try {
-      await adminApi.updateUserStatus(userId, status);
+      if (status === "active") {
+        await adminApi.unblockReviewer(userId);
+      } else {
+        await adminApi.updateUserStatus(userId, status);
+      }
       setSuccess("User status updated.");
       fetchData();
     } catch (err) {

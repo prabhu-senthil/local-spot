@@ -34,7 +34,7 @@ export function AuthPage() {
 
   useEffect(() => {
     if (mode === "register") {
-      fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/auth/register/init`)
+      fetch(`${import.meta.env.VITE_API_URL || "http://localhost"}/api/auth/register/init`)
         .then(res => res.json())
         .then(data => {
           if (data.roles) {

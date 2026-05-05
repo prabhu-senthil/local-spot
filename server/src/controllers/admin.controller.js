@@ -33,8 +33,46 @@ export async function updateUserStatus(req, res) {
       return res.status(400).json({ message: "Invalid status." });
     }
 
-    const user = await User.findByIdAndUpdate(userId, { status }, { new: true }).select("-passwordHash");
+    const updateData = { status };
+    if (status === "blocked") {
+      updateData.reviewerTrustScore = 0;
+    } else if (status === "active") {
+      updateData.reviewerTrustScore = 0; // Reset score when unblocking
+    }
+
+    const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).select("-passwordHash");
     if (!user) return res.status(404).json({ message: "User not found." });
+
+    if (status === "active") {
+      // Find all suspicious reviews by this user to get affected venues
+      const suspiciousReviews = await Review.find({ 
+        userId: user._id, 
+        isSuspicious: true 
+      }).select("venueId");
+      
+      const affectedVenueIds = [...new Set(suspiciousReviews.map(r => r.venueId.toString()))];
+
+      // Delete those suspicious reviews
+      await Review.deleteMany({ 
+        userId: user._id, 
+        isSuspicious: true 
+      });
+
+      // Recalculate Venue Ratings and Review Counts
+      for (const venueId of affectedVenueIds) {
+        const remainingReviews = await Review.find({ venueId });
+        
+        const newReviewCount = remainingReviews.length;
+        const newAvgRating = newReviewCount > 0 
+          ? remainingReviews.reduce((sum, r) => sum + r.rating, 0) / newReviewCount 
+          : 0;
+
+        await Venue.findByIdAndUpdate(venueId, {
+          reviewCount: newReviewCount,
+          avgRating: newAvgRating
+        });
+      }
+    }
 
     return res.status(200).json({ message: `User status updated to ${status}.`, user });
   } catch (err) {
@@ -143,6 +181,35 @@ export async function unblockReviewer(req, res) {
 
     if (!user) {
       return res.status(404).json({ message: "User not found." });
+    }
+
+    // Step 1: Find all suspicious reviews by this user to get affected venues
+    const suspiciousReviews = await Review.find({ 
+      userId: user._id, 
+      isSuspicious: true 
+    }).select("venueId");
+    
+    const affectedVenueIds = [...new Set(suspiciousReviews.map(r => r.venueId.toString()))];
+
+    // Step 2: Delete those suspicious reviews
+    await Review.deleteMany({ 
+      userId: user._id, 
+      isSuspicious: true 
+    });
+
+    // Step 3: Recalculate Venue Ratings and Review Counts
+    for (const venueId of affectedVenueIds) {
+      const remainingReviews = await Review.find({ venueId });
+      
+      const newReviewCount = remainingReviews.length;
+      const newAvgRating = newReviewCount > 0 
+        ? remainingReviews.reduce((sum, r) => sum + r.rating, 0) / newReviewCount 
+        : 0;
+
+      await Venue.findByIdAndUpdate(venueId, {
+        reviewCount: newReviewCount,
+        avgRating: newAvgRating
+      });
     }
 
     return res.status(200).json({
