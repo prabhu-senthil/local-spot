@@ -39,7 +39,7 @@ export async function applyTrustAndBlocking(reviewerId) {
     score < BLOCK_THRESHOLD && totalVotes >= MIN_VOTES_TO_BLOCK;
 
   const updatePayload = {
-    reviewerTrustScore: score,
+    reviewerTrustScore: shouldBlock ? 0 : score,
     ...(shouldBlock ? { status: "blocked" } : {}),
   };
 

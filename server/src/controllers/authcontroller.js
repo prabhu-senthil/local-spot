@@ -66,6 +66,7 @@ export async function register(req, res, _next) {
       token: accessToken,
     });
   } catch (err) {
+    console.error("Register Error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 }
